@@ -1,41 +1,41 @@
-# Project Completion Analysis
+# 项目完成度分析
 
-## 1. Overall Conclusion
+## 1. 总体结论
 
-The project is suitable as a BUPT project-course stage 2 topic B submission baseline. It implements a standalone RV32I five-stage pipelined CPU SoC for NEXYS4 DDR, with simulation scripts, build scripts, boot software, MMIO peripherals, performance counters, and several extension features.
+本项目已经可以作为北京邮电大学《项目式课程阶段二》题目 B 的 RISC-V CPU 方向提交基础。它在 NEXYS4 DDR 平台上实现了一个独立的 RV32I 五级流水 CPU SoC，并配套提供 boot 程序、仿真脚本、综合脚本、下载脚本、MMIO 外设、性能计数器和拓展功能。
 
-Current status:
+当前状态：
 
 ```text
-Simulation: passed
-Implementation/bitstream: passed
-Timing target: 100 MHz met
-Board-level evidence: to be collected by the student on physical NEXYS4 DDR hardware
+行为级仿真：已通过
+综合/实现/bitstream：已通过
+时序目标：满足 100 MHz
+实物上板证据：需要学生在 NEXYS4 DDR 上补充截图、照片或视频
 ```
 
-The design already covers the basic and advanced CPU requirements. The main remaining work is not RTL development, but collecting physical-board proof and writing the final report with screenshots, waveforms, PPA discussion, and measured performance data.
+也就是说，RTL 和工程脚本已经基本完成。后续课程交付重点是收集上板验证证据，并在报告中补充波形、串口输出、PPA 分析和性能计数数据。
 
-## 2. Requirement Coverage Matrix
+## 2. 课程要求覆盖矩阵
 
-| Requirement | Status | Evidence |
+| 课程要求 | 当前状态 | 说明 |
 | --- | --- | --- |
-| RV32I or custom ISA CPU | Complete | RV32I decode, immediate generation, ALU, load/store, branch, jump are implemented under `src/bupt_riscv/riscv_core/`. |
-| Basic arithmetic and logic instructions | Complete | `add/sub/sll/slt/sltu/xor/srl/sra/or/and` and I-type ALU operations are supported. |
-| Basic memory access | Complete | `lb/lh/lw/lbu/lhu` and `sb/sh/sw` are implemented with byte-lane alignment. |
-| Branch and jump instructions | Complete | `beq/bne/blt/bge/bltu/bgeu`, `jal`, and `jalr` are implemented. |
-| Five-stage pipeline | Complete | IF, ID, EX, MEM, WB pipeline registers and control flow are implemented in `riscv.v`. |
-| Data hazard handling | Complete | EX/MEM/WB forwarding and load-use stall are implemented. |
-| Control hazard handling | Complete | Branch prediction, EX-stage resolution, and wrong-path flush are implemented. |
-| Memory and I/O integration | Complete | Boot ROM, BRAM, UART, GPIO, timer, DDR bridge, and MMIO bus are integrated. |
-| Performance counters | Complete | Cycle, retired instruction, branch, mispredict, and stall counters are exposed by MMIO. |
-| Vivado 2025.2 simulation script | Complete | `scripts/sim_bupt_riscv.tcl`. |
-| Vivado 2025.2 build script | Complete | `scripts/build_bupt_riscv.tcl`. |
-| NEXYS4 DDR programming script | Complete | `scripts/program_bupt_riscv.tcl`. |
-| Physical board validation | Pending evidence | Needs serial screenshot, LED photo/video, and hardware run log after programming the board. |
+| RV32I 或自定义 ISA CPU | 已完成 | 本项目采用 RV32I 课程子集，不再沿用原始 MIPS ISA。 |
+| 基本算术逻辑指令 | 已完成 | 支持 `add/sub/sll/slt/sltu/xor/srl/sra/or/and` 以及 I 型 ALU 指令。 |
+| 基本访存指令 | 已完成 | 支持 `lb/lh/lw/lbu/lhu` 和 `sb/sh/sw`，包含字节使能和符号扩展。 |
+| 分支跳转指令 | 已完成 | 支持 `beq/bne/blt/bge/bltu/bgeu`、`jal`、`jalr`。 |
+| 五级流水线 | 已完成 | 实现 IF、ID、EX、MEM、WB 五级流水寄存器和控制流。 |
+| 数据冒险处理 | 已完成 | 实现 EX/MEM/WB 前递和 load-use 暂停。 |
+| 控制冒险处理 | 已完成 | 实现分支预测、EX 阶段解析和错误路径 flush。 |
+| 内存和 I/O 集成 | 已完成 | 集成 Boot ROM、BRAM、UART、GPIO、Timer、DDR Bridge、性能计数 MMIO。 |
+| 性能计数器 | 已完成 | 支持 cycle、retired instruction、branch、mispredict、stall 计数。 |
+| Vivado 2025.2 仿真脚本 | 已完成 | `scripts/sim_bupt_riscv.tcl`。 |
+| Vivado 2025.2 构建脚本 | 已完成 | `scripts/build_bupt_riscv.tcl`。 |
+| NEXYS4 DDR 下载脚本 | 已完成 | `scripts/program_bupt_riscv.tcl`。 |
+| 实物硬件验证 | 待补证据 | 需要下载板卡后保存串口截图、LED 照片或视频。 |
 
-## 3. RV32I Instruction Coverage
+## 3. RV32I 指令完成度
 
-Implemented course subset:
+已实现的 RV32I 课程子集：
 
 ```text
 lui, auipc
@@ -48,97 +48,119 @@ lb, lh, lw, lbu, lhu
 sb, sh, sw
 ```
 
-Important correctness points:
+关键正确性点：
 
-- `x0` is hardwired to zero in the register file.
-- B-type and J-type immediates use RISC-V bit placement.
-- Branch target uses `PC + imm`.
-- `jal` writes `PC + 4`.
-- `jalr` target clears bit 0.
-- Signed and unsigned branch comparisons are separated.
-- Load extension handles signed and zero-extended byte/halfword reads.
+- 寄存器 `x0` 恒为 0。
+- I/S/B/U/J 五类立即数按 RISC-V 格式生成。
+- 分支目标为 `PC + imm`。
+- `jal` 写回 `PC + 4`。
+- `jalr` 目标地址最低位清零。
+- 有符号和无符号比较分开处理。
+- load 指令支持 byte/halfword 的符号扩展和零扩展。
 
-## 4. Pipeline and Hazard Completion
+## 4. 流水线和冒险处理完成度
 
-Implemented:
+已经实现：
 
-- IF-stage instruction fetch and branch prediction.
-- ID-stage decode, register read, and immediate generation.
-- EX-stage ALU execution, branch/jump resolution, target generation.
-- MEM-stage data bus access.
-- WB-stage register writeback.
-- EX/MEM/WB to EX forwarding.
-- Load-use hazard stall.
-- DDR or slow-MMIO wait-state pipeline freeze.
-- Branch/jump misprediction flush.
+- IF 阶段取指和分支预测。
+- ID 阶段译码、寄存器读取、立即数生成。
+- EX 阶段 ALU 执行、分支/跳转解析、目标地址生成。
+- MEM 阶段数据总线访问。
+- WB 阶段寄存器写回。
+- EX/MEM/WB 到 EX 的数据前递。
+- load-use hazard 暂停。
+- DDR 或慢速 MMIO `d_ready=0` 时冻结流水线。
+- 分支、跳转、`jalr` 预测错误时 flush 错误路径。
 
-This satisfies the typical defense focus areas: why forwarding is needed, when stall is unavoidable, and how control hazards are corrected.
+这部分正好对应答辩中常问的问题：为什么需要前递、哪些情况必须暂停、分支预测错误后如何恢复正确 PC。
 
-## 5. Extension Feature Completion
+## 5. 拓展功能完成度
 
-### 5.1 Branch Prediction
+### 5.1 分支预测
 
-Status: complete.
+状态：已完成。
 
-Implemented as a 64-entry direct-mapped BTB/BHT:
+实现方式：
 
-- BTB stores predicted target.
-- BHT uses 2-bit saturating counters.
-- IF stage predicts.
-- EX stage resolves and updates.
-- Mispredict count is exposed through performance counters.
+- 64 项直接映射 BTB/BHT。
+- BTB 保存预测目标地址。
+- BHT 使用 2 位饱和计数器。
+- IF 阶段给出预测。
+- EX 阶段解析真实结果并更新预测器。
+- 错误预测次数通过性能计数器输出。
 
-### 5.2 D-Cache Replacement Strategy
+### 5.2 Cache 替换策略
 
-Status: complete.
+状态：已完成。
 
-Implemented in `src/bupt_riscv/dcache_2way_lru.v`:
+实现文件：
 
-- 16 sets.
-- 2 ways.
-- 1 word per cache line.
-- LRU victim selection.
-- Write-through policy.
-- Statistics: accesses, hits, misses, replacements.
-- MMIO address region: `0x1000_6000`.
+```text
+src/bupt_riscv/dcache_2way_lru.v
+```
 
-This is suitable for the course extension direction "Cache replacement strategy and hit-rate analysis".
+设计要点：
 
-### 5.3 RV32M Multiply/Divide
+- 16 组。
+- 2 路组相联。
+- 每行 1 个 word。
+- LRU victim 选择。
+- write-through 写策略。
+- 支持 accesses、hits、misses、replacements 统计。
+- MMIO 地址区域：`0x1000_6000`。
 
-Status: complete.
+这一部分可以作为课程拓展方向“Cache 替换策略优化与命中率分析”的支撑内容。报告中可以结合 `cache` shell 命令输出讨论命中率和替换次数。
 
-Implemented instructions:
+### 5.3 RV32M 乘除法扩展
+
+状态：已完成。
+
+支持指令：
 
 ```text
 mul, mulh, mulhsu, mulhu, div, divu, rem, remu
 ```
 
-The ALU includes RISC-V special-case behavior for divide-by-zero and signed overflow.
+ALU 中包含 RISC-V 对除零和有符号溢出的特殊结果处理。Boot 自测通过后会输出：
 
-### 5.4 FP32 MMIO Coprocessor
+```text
+M EXT PASS
+```
 
-Status: complete as an MMIO coprocessor, not as full RISC-V F extension.
+### 5.4 FP32 浮点协处理器
 
-Implemented in `src/bupt_riscv/fp_mmio.v`:
+状态：已完成 MMIO 形式的浮点协处理器，但不是完整 RISC-V F 扩展。
 
-- FP32 add demo path.
-- FP32 multiply demo path.
-- MMIO address region: `0x1000_7000`.
-- Boot self-test prints `FP TEST OK`.
+实现文件：
 
-For the final report, describe it as a memory-mapped floating-point coprocessor. Do not claim it is a full RISC-V F extension with floating-point registers and IEEE exception flags.
+```text
+src/bupt_riscv/fp_mmio.v
+```
 
-## 6. Verification Status
+设计要点：
 
-Simulation success markers:
+- 通过 MMIO 访问，不增加独立浮点寄存器堆。
+- 支持 FP32 加法演示路径。
+- 支持 FP32 乘法演示路径。
+- MMIO 地址区域：`0x1000_7000`。
+- Boot 自测通过后会输出：
+
+```text
+FP TEST OK
+```
+
+答辩和报告中建议表述为“内存映射浮点协处理器”，不要说成完整 RISC-V F 扩展，因为完整 F 扩展还涉及浮点寄存器堆、舍入模式、异常标志和更多指令。
+
+## 6. 验证状态
+
+行为级仿真成功标志：
 
 ```text
 Simulation succeeded: BUPT RISC-V CPU verified
 BUPT_RISCV_SIM_DONE
 ```
 
-Boot output checked by testbench:
+boot 和 testbench 检查的输出包括：
 
 ```text
 BUPT RISC-V CPU PROJECT
@@ -150,38 +172,40 @@ FP TEST OK
 PERF READY
 ```
 
-The latest implementation generated a bitstream and met 100 MHz timing. Summary:
+最近一次 Vivado 实现结果：
 
-| Metric | Result |
+| 指标 | 结果 |
 | --- | ---: |
 | WNS | 1.316 ns |
 | TNS | 0.000 ns |
-| Main 100 MHz clock WNS | 6.688 ns |
-| LUTs | 14279 / 63400, 22.52% |
-| Registers | 12305 / 126800, 9.70% |
-| BRAM tiles | 5 / 135, 3.70% |
-| DSPs | 14 / 240, 5.83% |
-| Estimated power | 1.826 W |
+| 主 100 MHz 时钟 WNS | 6.688 ns |
+| LUT | 14279 / 63400，22.52% |
+| Register | 12305 / 126800，9.70% |
+| BRAM Tile | 5 / 135，3.70% |
+| DSP | 14 / 240，5.83% |
+| 估计功耗 | 1.826 W |
 
-## 7. Remaining Work Before Final Defense
+结论：当前实现满足 100 MHz 时序，资源占用仍有较大余量。
 
-The RTL and scripts are complete enough for course acceptance. Before final submission, collect and add the following evidence to the report:
+## 7. 最终答辩前仍需补充的内容
 
-- Vivado simulation transcript screenshot.
-- Timing summary screenshot.
-- Utilization summary screenshot.
-- Serial terminal screenshot after programming NEXYS4 DDR.
-- Photo or short video proving LED control works.
-- `perf` command output and CPI calculation.
-- A short PPA tradeoff paragraph explaining the cost of pipeline forwarding, branch prediction, cache, RV32M, and FP MMIO.
+RTL 和脚本已经完成，答辩前建议补充以下材料：
 
-## 8. Recommended Defense Talking Points
+- Vivado 仿真成功截图。
+- Timing summary 截图。
+- Utilization summary 截图。
+- NEXYS4 DDR 下载后的串口输出截图。
+- `led 1` 点亮 LED 的照片或视频。
+- `perf` 命令输出，并计算 `CPI = cycles / retired instructions`。
+- 一段 PPA 权衡分析，说明前递网络、分支预测、Cache、RV32M、FP MMIO 对面积、性能和功耗的影响。
 
-- The design uses RV32I rather than the original MIPS ISA.
-- The CPU is not a single-cycle demo; it is a five-stage pipelined design.
-- Load-use hazards still need a stall because the loaded value is only available after memory access.
-- Forwarding reduces most ALU-to-ALU stalls.
-- Branch prediction improves control-flow throughput but costs LUT/register resources and needs flush recovery.
-- The cache uses LRU replacement to make replacement behavior explainable and measurable.
-- FP support is implemented as an MMIO coprocessor to keep the CPU core and register file manageable for a course project.
+## 8. 答辩建议说法
+
+- 本项目已经从原始 MIPS 思路改造为 RV32I 指令集。
+- CPU 不是单周期演示，而是 IF/ID/EX/MEM/WB 五级流水结构。
+- 大多数 ALU 相关冒险通过前递解决。
+- load-use 冒险仍然需要暂停，因为 load 数据要到 MEM 阶段后才可用。
+- 分支预测可以降低控制冒险代价，但需要 BTB/BHT 资源，并且预测错误时必须 flush。
+- Cache 使用 LRU 替换，便于解释、验证和统计命中率。
+- 浮点部分采用 MMIO 协处理器形式，降低完整 F 扩展带来的复杂度，适合课程项目规模。
 
