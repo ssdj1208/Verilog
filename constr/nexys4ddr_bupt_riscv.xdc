@@ -5,6 +5,13 @@ set_property BITSTREAM.STARTUP.STARTUPCLK JTAGCLK [current_design]
 set_property -dict { PACKAGE_PIN E3 IOSTANDARD LVCMOS33 } [get_ports { clk100mhz }]
 create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports { clk100mhz }]
 
+## The DDR backend bridge uses explicit toggle synchronizers between the SoC
+## bus clock and the MIG UI clock. Multi-bit payload registers are held stable
+## until the synchronized toggle is acknowledged, so these crossings are CDC
+## paths rather than single-cycle synchronous timing paths.
+set_false_path -from [get_clocks -quiet clk50_180_unbuf] -to [get_clocks -quiet clk_pll_i]
+set_false_path -from [get_clocks -quiet clk_pll_i] -to [get_clocks -quiet clk50_180_unbuf]
+
 ## Center button as reset
 set_property -dict { PACKAGE_PIN N17 IOSTANDARD LVCMOS33 } [get_ports { rst }]
 

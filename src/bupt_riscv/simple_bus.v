@@ -5,6 +5,7 @@ module simple_bus #(
     parameter TIMER_TICK_CYCLES = 32'd50000000
 )(
     input wire clk,
+    input wire perf_clk,
     input wire rst,
 
     input wire[31:0] i_addr,
@@ -39,7 +40,11 @@ module simple_bus #(
     input wire perf_retireW,
     input wire perf_branchE,
     input wire perf_mispredictE,
-    input wire perf_stall
+    input wire perf_stall,
+    input wire[31:0] debug_branch_pc,
+    input wire[31:0] debug_branch_srca,
+    input wire[31:0] debug_branch_srcb,
+    input wire[31:0] debug_branch_info
     );
 
     wire boot_sel_i = (i_addr[31:14] == 18'h00000);
@@ -53,6 +58,7 @@ module simple_bus #(
     wire perf_sel_d = (d_addr[31:8] == 24'h100050);
     wire cache_sel_d = (d_addr[31:8] == 24'h100060);
     wire fp_sel_d = (d_addr[31:8] == 24'h100070);
+    wire debug_sel_d = (d_addr[31:8] == 24'h100080);
     wire ddr_sel_d = (d_addr[31:27] == 5'b10000);
 
     wire ddr_ready;
@@ -83,6 +89,7 @@ module simple_bus #(
     wire[31:0] irq_rdata;
     wire[31:0] perf_rdata;
     reg[31:0] cache_mmio_rdata;
+    reg[31:0] debug_rdata;
     wire[31:0] fp_rdata;
     wire timer_irq;
 
@@ -157,7 +164,7 @@ module simple_bus #(
         );
 
     perf_mmio perf(
-        .clk(clk),
+        .clk(perf_clk),
         .rst(rst),
         .we(d_we & perf_sel_d & |d_wstrb),
         .re(d_re & perf_sel_d),
@@ -189,6 +196,16 @@ module simple_bus #(
             5'h10: cache_mmio_rdata = 32'h0002_0010; // 2-way, 16 sets
             5'h14: cache_mmio_rdata = 32'd1; // policy 1 = LRU
             default: cache_mmio_rdata = 32'b0;
+        endcase
+    end
+
+    always @(*) begin
+        case (d_addr[4:0])
+            5'h00: debug_rdata = debug_branch_pc;
+            5'h04: debug_rdata = debug_branch_srca;
+            5'h08: debug_rdata = debug_branch_srcb;
+            5'h0c: debug_rdata = debug_branch_info;
+            default: debug_rdata = 32'b0;
         endcase
     end
 
@@ -257,6 +274,7 @@ module simple_bus #(
                      perf_sel_d       ? perf_rdata :
                      cache_sel_d      ? cache_mmio_rdata :
                      fp_sel_d         ? fp_rdata :
+                     debug_sel_d      ? debug_rdata :
                      ddr_status_sel_d ? {30'b0, ddr_busy, ddr_calib_done} :
                      ddr_sel_d        ? cache_rdata : 32'b0;
 endmodule

@@ -44,6 +44,10 @@ module soc #(
     wire perf_branchE;
     wire perf_mispredictE;
     wire perf_stall;
+    wire[31:0] debug_branch_pc;
+    wire[31:0] debug_branch_srca;
+    wire[31:0] debug_branch_srcb;
+    wire[31:0] debug_branch_info;
 
     riscv cpu(
         .clk(clk),
@@ -60,7 +64,11 @@ module soc #(
         .perf_retireW(perf_retireW),
         .perf_branchE(perf_branchE),
         .perf_mispredictE(perf_mispredictE),
-        .perf_stall(perf_stall)
+        .perf_stall(perf_stall),
+        .debug_branch_pc(debug_branch_pc),
+        .debug_branch_srca(debug_branch_srca),
+        .debug_branch_srcb(debug_branch_srcb),
+        .debug_branch_info(debug_branch_info)
         );
 
     simple_bus #(
@@ -68,6 +76,7 @@ module soc #(
         .TIMER_TICK_CYCLES(TIMER_TICK_CYCLES)
     ) bus(
         .clk(bus_clk),
+        .perf_clk(clk),
         .rst(rst),
         .i_addr(pc),
         .i_rdata(instr),
@@ -97,7 +106,11 @@ module soc #(
         .perf_retireW(perf_retireW),
         .perf_branchE(perf_branchE),
         .perf_mispredictE(perf_mispredictE),
-        .perf_stall(perf_stall)
+        .perf_stall(perf_stall),
+        .debug_branch_pc(debug_branch_pc),
+        .debug_branch_srca(debug_branch_srca),
+        .debug_branch_srcb(debug_branch_srcb),
+        .debug_branch_info(debug_branch_info)
         );
 
     assign debug_writedata = writedata;

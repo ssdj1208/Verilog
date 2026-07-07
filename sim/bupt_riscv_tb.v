@@ -148,11 +148,18 @@ module bupt_riscv_tb();
 
     task expect_byte;
         input [7:0] expected;
+        integer extra_i;
         begin
             uart_recv_byte(rx_byte);
             if (rx_byte !== expected) begin
                 $display("Simulation Failed: expected byte %h (%c), got %h (%c)",
                          expected, expected, rx_byte, rx_byte);
+                $write("UART tail: %c", rx_byte);
+                for (extra_i = 0; extra_i < 80; extra_i = extra_i + 1) begin
+                    uart_recv_byte(rx_byte);
+                    $write("%c", rx_byte);
+                end
+                $display("");
                 $display("DEBUG pc=%h instr=%h instrD=%h pcD=%h pcE=%h validD=%b validE=%b",
                          dut.pc, dut.instr, dut.cpu.instrD, dut.cpu.pcD,
                          dut.cpu.pcE, dut.cpu.validD, dut.cpu.validE);

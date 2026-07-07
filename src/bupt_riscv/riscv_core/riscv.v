@@ -15,7 +15,11 @@ module riscv(
     output wire perf_retireW,
     output wire perf_branchE,
     output wire perf_mispredictE,
-    output wire perf_stall
+    output wire perf_stall,
+    output reg[31:0] debug_branch_pc,
+    output reg[31:0] debug_branch_srca,
+    output reg[31:0] debug_branch_srcb,
+    output reg[31:0] debug_branch_info
     );
 
     localparam WB_ALU = 2'b00;
@@ -47,6 +51,8 @@ module riscv(
     wire flushD;
     wire flushE;
     wire memstallM;
+    wire divstallE;
+    wire idex_en;
 
     wire[31:0] pcplus4F = pcF + 32'd4;
     wire pred_takenF;
@@ -229,30 +235,32 @@ module riscv(
     wire pred_takenE;
     wire[31:0] pred_targetE;
 
-    flopenrc #(32) idex_pc(clk, rst, ~memstallM, flushE, pcD, pcE);
-    flopenrc #(32) idex_pc4(clk, rst, ~memstallM, flushE, pcplus4D, pcplus4E);
-    flopenrc #(32) idex_rd1(clk, rst, ~memstallM, flushE, rd1D, rd1E);
-    flopenrc #(32) idex_rd2(clk, rst, ~memstallM, flushE, rd2D, rd2E);
-    flopenrc #(32) idex_imm(clk, rst, ~memstallM, flushE, immD, immE);
-    flopenrc #(5)  idex_rs1(clk, rst, ~memstallM, flushE, rs1D, rs1E);
-    flopenrc #(5)  idex_rs2(clk, rst, ~memstallM, flushE, rs2D, rs2E);
-    flopenrc #(5)  idex_rd(clk, rst, ~memstallM, flushE, rdD, rdE);
-    flopenrc #(3)  idex_funct3(clk, rst, ~memstallM, flushE, funct3D, funct3E);
-    flopenrc #(3)  idex_loadfunct(clk, rst, ~memstallM, flushE, load_funct3D, load_funct3E);
-    flopenrc #(3)  idex_storefunct(clk, rst, ~memstallM, flushE, store_funct3D, store_funct3E);
-    flopenrc #(1)  idex_regwrite(clk, rst, ~memstallM, flushE, regwriteD & ~illegalD & validD, regwriteE);
-    flopenrc #(1)  idex_memread(clk, rst, ~memstallM, flushE, memreadD & ~illegalD & validD, memreadE);
-    flopenrc #(1)  idex_memwrite(clk, rst, ~memstallM, flushE, memwriteD & ~illegalD & validD, memwriteE);
-    flopenrc #(2)  idex_wbsel(clk, rst, ~memstallM, flushE, wbselD, wbselE);
-    flopenrc #(1)  idex_alusrc(clk, rst, ~memstallM, flushE, alusrcD, alusrcE);
-    flopenrc #(2)  idex_srcasel(clk, rst, ~memstallM, flushE, srca_selD, srca_selE);
-    flopenrc #(5)  idex_alucontrol(clk, rst, ~memstallM, flushE, alucontrolD, alucontrolE);
-    flopenrc #(1)  idex_branch(clk, rst, ~memstallM, flushE, branchD & ~illegalD & validD, branchE);
-    flopenrc #(1)  idex_jump(clk, rst, ~memstallM, flushE, jumpD & ~illegalD & validD, jumpE);
-    flopenrc #(1)  idex_jalr(clk, rst, ~memstallM, flushE, jalrD & ~illegalD & validD, jalrE);
-    flopenrc #(1)  idex_pred_taken(clk, rst, ~memstallM, flushE, pred_takenD, pred_takenE);
-    flopenrc #(32) idex_pred_target(clk, rst, ~memstallM, flushE, pred_targetD, pred_targetE);
-    flopenrc #(1)  idex_valid(clk, rst, ~memstallM, flushE, validD & ~illegalD, validE);
+    assign idex_en = ~memstallM & ~divstallE;
+
+    flopenrc #(32) idex_pc(clk, rst, idex_en, flushE, pcD, pcE);
+    flopenrc #(32) idex_pc4(clk, rst, idex_en, flushE, pcplus4D, pcplus4E);
+    flopenrc #(32) idex_rd1(clk, rst, idex_en, flushE, rd1D, rd1E);
+    flopenrc #(32) idex_rd2(clk, rst, idex_en, flushE, rd2D, rd2E);
+    flopenrc #(32) idex_imm(clk, rst, idex_en, flushE, immD, immE);
+    flopenrc #(5)  idex_rs1(clk, rst, idex_en, flushE, rs1D, rs1E);
+    flopenrc #(5)  idex_rs2(clk, rst, idex_en, flushE, rs2D, rs2E);
+    flopenrc #(5)  idex_rd(clk, rst, idex_en, flushE, rdD, rdE);
+    flopenrc #(3)  idex_funct3(clk, rst, idex_en, flushE, funct3D, funct3E);
+    flopenrc #(3)  idex_loadfunct(clk, rst, idex_en, flushE, load_funct3D, load_funct3E);
+    flopenrc #(3)  idex_storefunct(clk, rst, idex_en, flushE, store_funct3D, store_funct3E);
+    flopenrc #(1)  idex_regwrite(clk, rst, idex_en, flushE, regwriteD & ~illegalD & validD, regwriteE);
+    flopenrc #(1)  idex_memread(clk, rst, idex_en, flushE, memreadD & ~illegalD & validD, memreadE);
+    flopenrc #(1)  idex_memwrite(clk, rst, idex_en, flushE, memwriteD & ~illegalD & validD, memwriteE);
+    flopenrc #(2)  idex_wbsel(clk, rst, idex_en, flushE, wbselD, wbselE);
+    flopenrc #(1)  idex_alusrc(clk, rst, idex_en, flushE, alusrcD, alusrcE);
+    flopenrc #(2)  idex_srcasel(clk, rst, idex_en, flushE, srca_selD, srca_selE);
+    flopenrc #(5)  idex_alucontrol(clk, rst, idex_en, flushE, alucontrolD, alucontrolE);
+    flopenrc #(1)  idex_branch(clk, rst, idex_en, flushE, branchD & ~illegalD & validD, branchE);
+    flopenrc #(1)  idex_jump(clk, rst, idex_en, flushE, jumpD & ~illegalD & validD, jumpE);
+    flopenrc #(1)  idex_jalr(clk, rst, idex_en, flushE, jalrD & ~illegalD & validD, jalrE);
+    flopenrc #(1)  idex_pred_taken(clk, rst, idex_en, flushE, pred_takenD, pred_takenE);
+    flopenrc #(32) idex_pred_target(clk, rst, idex_en, flushE, pred_targetD, pred_targetE);
+    flopenrc #(1)  idex_valid(clk, rst, idex_en, flushE, validD & ~illegalD, validE);
 
     wire regwriteM;
     wire memreadM;
@@ -296,6 +304,33 @@ module riscv(
     wire[31:0] aluResultE;
     alu alu(aluSrcAE, aluSrcBE, alucontrolE, aluResultE);
 
+    wire div_opE = validE & ((alucontrolE == ALU_DIV) ||
+                             (alucontrolE == ALU_DIVU) ||
+                             (alucontrolE == ALU_REM) ||
+                             (alucontrolE == ALU_REMU));
+    wire div_signedE = (alucontrolE == ALU_DIV) || (alucontrolE == ALU_REM);
+    wire div_remE = (alucontrolE == ALU_REM) || (alucontrolE == ALU_REMU);
+    wire div_busy;
+    wire div_ready;
+    wire[31:0] div_resultE;
+    wire div_startE = div_opE & ~div_busy & ~div_ready & ~memstallM;
+    assign divstallE = div_opE & ~div_ready;
+
+    iter_div div_unit(
+        .clk(clk),
+        .rst(rst),
+        .start(div_startE),
+        .signed_op(div_signedE),
+        .rem_op(div_remE),
+        .dividend_i(srca_forwardE),
+        .divisor_i(srcb_forwardE),
+        .busy(div_busy),
+        .ready(div_ready),
+        .result(div_resultE)
+        );
+
+    wire[31:0] executeResultE = div_opE ? div_resultE : aluResultE;
+
     reg branch_takenE;
     always @(*) begin
         case (funct3E)
@@ -319,21 +354,38 @@ module riscv(
     assign redirectE = pred_wrongE;
     assign redirect_targetE = actual_takenE ? actual_targetE : pcplus4E;
 
+    always @(posedge clk) begin
+        if (rst) begin
+            debug_branch_pc <= 32'b0;
+            debug_branch_srca <= 32'b0;
+            debug_branch_srcb <= 32'b0;
+            debug_branch_info <= 32'b0;
+        end else if (validE & branchE & ~memstallM) begin
+            debug_branch_pc <= pcE;
+            debug_branch_srca <= srca_forwardE;
+            debug_branch_srcb <= srcb_forwardE;
+            debug_branch_info <= {23'b0, branchE, validE, funct3E,
+                                  pred_wrongE, pred_takenE,
+                                  actual_takenE, branch_takenE};
+        end
+    end
+
     // EX/MEM
     wire[31:0] storeDataM;
     wire[2:0] load_funct3M;
     wire[2:0] store_funct3M;
+    wire exmem_bubbleE = divstallE;
 
-    flopenr #(32) exmem_alu(clk, rst, ~memstallM, aluResultE, aluResultM);
-    flopenr #(32) exmem_store(clk, rst, ~memstallM, srcb_forwardE, storeDataM);
-    flopenr #(32) exmem_pc4(clk, rst, ~memstallM, pcplus4E, pcplus4M);
-    flopenr #(5)  exmem_rd(clk, rst, ~memstallM, rdE, rdM);
-    flopenr #(3)  exmem_loadfunct(clk, rst, ~memstallM, load_funct3E, load_funct3M);
-    flopenr #(3)  exmem_storefunct(clk, rst, ~memstallM, store_funct3E, store_funct3M);
-    flopenr #(1)  exmem_regwrite(clk, rst, ~memstallM, regwriteE & validE, regwriteM);
-    flopenr #(1)  exmem_memread(clk, rst, ~memstallM, memreadE & validE, memreadM);
-    flopenr #(1)  exmem_memwrite(clk, rst, ~memstallM, memwriteE & validE, memwriteM);
-    flopenr #(2)  exmem_wbsel(clk, rst, ~memstallM, wbselE, wbselM);
+    flopenr #(32) exmem_alu(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : executeResultE, aluResultM);
+    flopenr #(32) exmem_store(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : srcb_forwardE, storeDataM);
+    flopenr #(32) exmem_pc4(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : pcplus4E, pcplus4M);
+    flopenr #(5)  exmem_rd(clk, rst, ~memstallM, exmem_bubbleE ? 5'b0 : rdE, rdM);
+    flopenr #(3)  exmem_loadfunct(clk, rst, ~memstallM, exmem_bubbleE ? 3'b0 : load_funct3E, load_funct3M);
+    flopenr #(3)  exmem_storefunct(clk, rst, ~memstallM, exmem_bubbleE ? 3'b0 : store_funct3E, store_funct3M);
+    flopenr #(1)  exmem_regwrite(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (regwriteE & validE), regwriteM);
+    flopenr #(1)  exmem_memread(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (memreadE & validE), memreadM);
+    flopenr #(1)  exmem_memwrite(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (memwriteE & validE), memwriteM);
+    flopenr #(2)  exmem_wbsel(clk, rst, ~memstallM, exmem_bubbleE ? WB_ALU : wbselE, wbselM);
 
     assign d_validM = memreadM | memwriteM;
     assign memstallM = d_validM & ~d_readyM;
@@ -361,8 +413,8 @@ module riscv(
     wire lwstallD = memreadE &&
         (((rs1D == rdE) && uses_rs1D && (rs1D != 5'b0)) ||
          ((rs2D == rdE) && uses_rs2D && (rs2D != 5'b0)));
-    assign stallD = lwstallD;
-    assign stallF = lwstallD;
+    assign stallD = lwstallD | divstallE;
+    assign stallF = lwstallD | divstallE;
     assign flushD = redirectE & ~memstallM;
     assign flushE = (lwstallD | redirectE) & ~memstallM;
 

@@ -41,28 +41,17 @@ module top(
     end
 
     wire clk200mhz;
+    wire clk50mhz;
+    wire clk50mhz_180;
     wire clk200_locked;
-    reg clk50mhz;
-    wire clk50mhz_buf;
 
     clk_100_to_200 clkgen(
         .clk100(clk100mhz),
         .rst(rst),
         .clk200(clk200mhz),
+        .clk50(clk50mhz),
+        .clk50_180(clk50mhz_180),
         .locked(clk200_locked)
-        );
-
-    always @(posedge clk100mhz or posedge por_rst) begin
-        if (por_rst) begin
-            clk50mhz <= 1'b0;
-        end else begin
-            clk50mhz <= ~clk50mhz;
-        end
-    end
-
-    BUFG clk50_buf(
-        .I(clk50mhz),
-        .O(clk50mhz_buf)
         );
 
     wire ui_clk;
@@ -119,8 +108,8 @@ module top(
 
     reg[3:0] rst_sync;
     wire soc_rst;
-    wire soc_clk = clk50mhz_buf;
-    wire bus_clk = ~clk50mhz_buf;
+    wire soc_clk = clk50mhz;
+    wire bus_clk = clk50mhz_180;
     wire backend_clk = ui_clk;
 
     always @(posedge soc_clk or posedge por_rst) begin

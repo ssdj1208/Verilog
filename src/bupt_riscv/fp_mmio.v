@@ -35,15 +35,19 @@ module fp_mmio(
         end
     end
 
-    always @(*) begin
-        case (addr)
-            5'h00: rdata = op_a;
-            5'h04: rdata = op_b;
-            5'h08: rdata = {30'b0, op_sel};
-            5'h0c: rdata = result;
-            5'h10: rdata = 32'd1; // ready
-            default: rdata = 32'b0;
-        endcase
+    always @(posedge clk) begin
+        if (rst) begin
+            rdata <= 32'b0;
+        end else if (re) begin
+            case (addr)
+                5'h00: rdata <= op_a;
+                5'h04: rdata <= op_b;
+                5'h08: rdata <= {30'b0, op_sel};
+                5'h0c: rdata <= result;
+                5'h10: rdata <= 32'd1; // ready
+                default: rdata <= 32'b0;
+            endcase
+        end
     end
 endmodule
 

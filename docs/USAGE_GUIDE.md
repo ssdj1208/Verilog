@@ -1,6 +1,6 @@
 # BUPT RISC-V 项目使用说明
 
-本文档说明如何在 Windows + Vivado 2025.2 环境下使用本项目，包括生成 boot ROM、运行仿真、综合实现、下载板卡和串口验收。
+本文档说明如何在 Windows + Vivado 环境下使用本项目，包括生成 boot ROM、运行仿真、综合实现、下载板卡和串口验收。
 
 ## 1. 环境要求
 
@@ -8,7 +8,7 @@
 
 ```text
 板卡：NEXYS4 DDR / Artix-7 xc7a100tcsg324-1
-工具：Vivado 2025.2
+工具：Vivado 2023.2
 系统：Windows PowerShell
 串口：115200 8N1
 ```
@@ -16,13 +16,13 @@
 本机 Vivado 路径：
 
 ```powershell
-D:\programe_files\vivado\2025.2\Vivado\settings64.bat
+D:\Xilinx\Vivado\2023.2\settings64.bat
 ```
 
 如果你换了电脑或 Vivado 安装位置不同，请先检查路径：
 
 ```powershell
-Test-Path "D:\programe_files\vivado\2025.2\Vivado\settings64.bat"
+Test-Path "D:\Xilinx\Vivado\2023.2\settings64.bat"
 ```
 
 如果返回 `False`，需要把后续命令中的 Vivado 路径替换成你的实际安装路径。
@@ -36,6 +36,7 @@ src/bupt_riscv/simple_bus.v       地址译码和 MMIO 总线
 src/bupt_riscv/riscv_core/        五级流水 RV32I CPU 核
 src/bupt_riscv/dcache_2way_lru.v  2 路 LRU D-Cache
 src/bupt_riscv/fp_mmio.v          FP32 MMIO 浮点协处理器
+src/common/                       通用 UART 收发模块
 software/bupt_riscv/              Boot 镜像生成脚本
 sim/bupt_riscv_tb.v               仿真 testbench
 scripts/                          Vivado batch 脚本
@@ -68,7 +69,7 @@ software/bupt_riscv/gen_bupt_boot.lst
 执行：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
 ```
 
 仿真成功标志：
@@ -94,7 +95,7 @@ testbench 会检查以下内容：
 执行：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\build_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\build_bupt_riscv.tcl"
 ```
 
 成功后会生成：
@@ -103,7 +104,7 @@ cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode 
 build/bupt_riscv_top.bit
 ```
 
-最近一次验证结果已经满足 100 MHz 时序，资源占用和功耗估计见：
+当前 Vivado 2023.2 构建结果满足 100 MHz 时序，资源占用和功耗估计见：
 
 ```text
 docs/bupt_riscv_build_summary.md
@@ -114,7 +115,7 @@ docs/bupt_riscv_build_summary.md
 连接 NEXYS4 DDR 板卡 USB 后执行：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\program_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\program_bupt_riscv.tcl"
 ```
 
 然后打开串口工具，参数设置为：
@@ -158,7 +159,7 @@ run demo   运行综合演示
 先检查 settings 脚本是否存在：
 
 ```powershell
-Test-Path "D:\programe_files\vivado\2025.2\Vivado\settings64.bat"
+Test-Path "D:\Xilinx\Vivado\2023.2\settings64.bat"
 ```
 
 如果路径不存在，找到你自己的 Vivado 安装目录后替换命令中的路径。

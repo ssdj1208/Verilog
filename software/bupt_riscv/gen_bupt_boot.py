@@ -10,6 +10,7 @@ DDR_STATUS_BASE = 0x10004000
 PERF_BASE = 0x10005000
 CACHE_BASE = 0x10006000
 FP_BASE = 0x10007000
+DEBUG_BASE = 0x10008000
 DDR_BASE = 0x80000000
 BRAM_BASE = 0x00010000
 
@@ -288,8 +289,26 @@ expect("t2", 2)
 ret()
 
 label("isa_fail")
+li("t0", DEBUG_BASE)
+lw("s2", 0, "t0")
+lw("s3", 4, "t0")
+lw("s4", 8, "t0")
+lw("s5", 12, "t0")
 puts_label("msg_isa_fail")
-j("isa_fail")
+puts_label("msg_dbg_pc")
+addi("a0", "s2", 0)
+call("print_hex")
+puts_label("msg_dbg_srca")
+addi("a0", "s3", 0)
+call("print_hex")
+puts_label("msg_dbg_srcb")
+addi("a0", "s4", 0)
+call("print_hex")
+puts_label("msg_dbg_info")
+addi("a0", "s5", 0)
+call("print_hex")
+label("isa_fail_halt")
+j("isa_fail_halt")
 
 label("ddr_test")
 addi("sp", "sp", -4)
@@ -595,6 +614,10 @@ bytes_label("msg_branch", "branches=")
 bytes_label("msg_misp", "mispredicts=")
 bytes_label("msg_stall", "stalls=")
 bytes_label("msg_cache_hits", "cache_hits=")
+bytes_label("msg_dbg_pc", "branch_pc=")
+bytes_label("msg_dbg_srca", "branch_srca=")
+bytes_label("msg_dbg_srcb", "branch_srcb=")
+bytes_label("msg_dbg_info", "branch_info=")
 
 for index, kind, target, a, b, funct3 in fixups:
     here = index * 4

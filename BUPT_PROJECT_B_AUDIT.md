@@ -2,8 +2,8 @@
 
 审查对象：`step_into_mips` 中新增的 `bupt_riscv` 独立工程  
 审查日期：2026-07-06  
-目标平台：NEXYS4 DDR，Vivado 2025.2  
-当前结论：工程主体已经满足题目 B 的基础要求、进阶要求，并补齐流水线冒险、Cache 替换策略、乘除法扩展和浮点协处理器等拓展方向；仍需要补充实物上板验收记录，课程报告中可直接引用本仓库的仿真、综合和 PPA 数据。
+目标平台：NEXYS4 DDR，Vivado 2023.2  
+当前结论：工程主体已经满足题目 B 的基础要求、进阶要求，并补齐流水线冒险、Cache 替换策略、乘除法扩展和浮点协处理器等拓展方向；Vivado 行为级仿真、综合、实现和 bitstream 生成已通过，仍需要补充实物上板验收记录。
 
 ## 1. 课程要求来源
 
@@ -24,8 +24,8 @@
 | 数据冒险处理 | 已满足 | EX/MEM/WB 到 EX 前递，load-use stall，DDR wait-state stall 已实现。 |
 | 控制冒险处理 | 已满足 | 64 项 BTB/BHT 分支预测，EX 阶段解析并 flush 错误路径。 |
 | 内存与 I/O 系统 | 已满足 | Boot ROM、BRAM、DDR bridge、UART、GPIO、Timer、Perf MMIO 已集成。 |
-| 仿真验证 | 已满足 | Vivado 2025.2 行为级仿真通过。 |
-| 综合/实现/bitstream | 已满足 | 已重新完成 Vivado 2025.2 实现并生成 `build/bupt_riscv_top.bit`，时序满足 100 MHz。 |
+| 仿真验证 | 已满足 | Vivado 2023.2 行为级仿真通过。 |
+| 综合/实现/bitstream | 已满足 | Vivado 2023.2 已生成 `build/bupt_riscv_top.bit`，时序满足 100 MHz。 |
 | 实物硬件验证 | 待补证据 | 需要你在 NEXYS4 DDR 上下载 bit，并保存串口输出和 LED 照片/视频。 |
 | CPI/吞吐量/PPA 报告 | 部分满足 | 硬件计数器已支持，文档中仍需补实验数据和分析表。 |
 | Cache 替换策略/乘除法/浮点 | 已满足 | 已新增 2 路 LRU D-Cache、RV32M 乘除法指令和 FP32 MMIO 协处理器，并通过 boot/testbench 验证。 |
@@ -158,10 +158,10 @@
 
 状态：已满足。
 
-已在 Vivado 2025.2 中重新运行：
+已在 Vivado 2023.2 中重新运行：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
 ```
 
 结果：
@@ -185,11 +185,11 @@ BUPT_RISCV_SIM_DONE
 
 - 构建脚本面向 `xc7a100tcsg324-1`，即 NEXYS4 DDR 所用 Artix-7 器件，见 `scripts/build_bupt_riscv.tcl:6`。
 - 构建脚本加载 `nexys4ddr_bupt_riscv.xdc` 并执行到 `write_bitstream`，见 `scripts/build_bupt_riscv.tcl:20` 和 `scripts/build_bupt_riscv.tcl:30`。
-- 已于 2026-07-06 19:09 重新完成实现和 bitstream 生成，当前目录存在最终 bit 文件：`build/bupt_riscv_top.bit`。
-- Vivado 日志显示 `Bitgen Completed Successfully`，并输出 `BUPT_RISCV_BITSTREAM=D:/project/step_into_mips/build/bupt_riscv_top.bit`。
-- 时序满足 100 MHz：全设计 WNS = 1.316 ns，TNS = 0.000 ns；主 `sys_clk_pin` 时钟域 WNS = 6.688 ns。
-- 资源占用：Slice LUTs 14279/63400（22.52%），Slice Registers 12305/126800（9.70%），Block RAM Tile 5/135（3.70%），DSP 14/240（5.83%）。
-- 功耗估计：Total On-Chip Power 1.826 W，Dynamic Power 1.715 W，Device Static Power 0.111 W。
+- 已于 2026-07-07 10:22 完成实现和 bitstream 生成，当前目录存在最终 bit 文件：`build/bupt_riscv_top.bit`。
+- Vivado 成功日志显示 `Bitgen Completed Successfully`，并输出 `BUPT_RISCV_BITSTREAM=D:/CodeProject/Verilog_Project/COCP/Verilog/build/bupt_riscv_top.bit`。
+- 时序满足 100 MHz：全设计 WNS = 1.316 ns，TNS = 0.000 ns；主 `sys_clk_pin` 时钟域 WNS = 6.446 ns。
+- 资源占用：Slice LUTs 14153/63400（22.32%），Slice Registers 12313/126800（9.71%），Block RAM Tile 5/135（3.70%），DSP 14/240（5.83%）。
+- 功耗估计：Total On-Chip Power 1.707 W，Dynamic Power 1.597 W，Device Static Power 0.110 W。
 - 精简构建摘要见 `docs/bupt_riscv_build_summary.md`。
 
 建议补证据：
@@ -249,7 +249,7 @@ rv32>
 - `scripts/build_bupt_riscv.tcl`：Vivado 综合实现脚本。
 - `scripts/program_bupt_riscv.tcl`：NEXYS4 下载脚本。
 - `constr/nexys4ddr_bupt_riscv.xdc`：NEXYS4 DDR 约束。
-- `build/bupt_riscv_top.bit`：当前已生成 bitstream。
+- `build/bupt_riscv_top.bit`：运行 `scripts/build_bupt_riscv.tcl` 后生成的 bitstream。
 
 ## 8. 最终评分风险与建议
 

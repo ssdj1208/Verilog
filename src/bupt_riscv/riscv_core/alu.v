@@ -50,18 +50,10 @@ module alu(
             ALU_MULH:  y = mul_ss[63:32];
             ALU_MULHSU: y = mul_su[63:32];
             ALU_MULHU: y = mul_uu[63:32];
-            ALU_DIV: begin
-                if (b == 32'b0) y = 32'hffff_ffff;
-                else if (a == 32'h8000_0000 && b == 32'hffff_ffff) y = 32'h8000_0000;
-                else y = as / bs;
-            end
-            ALU_DIVU: y = (b == 32'b0) ? 32'hffff_ffff : (a / b);
-            ALU_REM: begin
-                if (b == 32'b0) y = a;
-                else if (a == 32'h8000_0000 && b == 32'hffff_ffff) y = 32'b0;
-                else y = as % bs;
-            end
-            ALU_REMU: y = (b == 32'b0) ? a : (a % b);
+            ALU_DIV,
+            ALU_DIVU,
+            ALU_REM,
+            ALU_REMU: y = 32'b0;
             default:   y = 32'b0;
         endcase
     end

@@ -1,7 +1,24 @@
 set script_dir [file dirname [file normalize [info script]]]
 set repo_dir [file normalize [file join $script_dir ..]]
-set proj_dir [file normalize [file join $repo_dir build bupt_riscv_vivado]]
+set build_name bupt_riscv_vivado
+if {[info exists env(BUPT_RISCV_BUILD_NAME)] && $env(BUPT_RISCV_BUILD_NAME) ne ""} {
+    set build_name $env(BUPT_RISCV_BUILD_NAME)
+}
+set proj_dir [file normalize [file join $repo_dir build $build_name]]
 set bit_out  [file normalize [file join $repo_dir build bupt_riscv_top.bit]]
+set common_files [glob -nocomplain [file join $repo_dir src common *.v]]
+set core_files [glob -nocomplain [file join $repo_dir src bupt_riscv riscv_core *.v]]
+set soc_files [glob -nocomplain [file join $repo_dir src bupt_riscv *.v]]
+
+if {[llength $common_files] == 0} {
+    error "No UART/common RTL found under src/common/*.v"
+}
+if {[llength $core_files] == 0} {
+    error "No RISC-V core RTL found under src/bupt_riscv/riscv_core/*.v"
+}
+if {[llength $soc_files] == 0} {
+    error "No SoC RTL found under src/bupt_riscv/*.v"
+}
 
 create_project bupt_riscv $proj_dir -part xc7a100tcsg324-1 -force
 
@@ -9,9 +26,9 @@ create_ip -name mig_7series -vendor xilinx.com -library ip -version 4.2 -module_
 set_property -dict [list CONFIG.XML_INPUT_FILE [file join $repo_dir src bupt_riscv mig nexys4ddr_mig.prj]] [get_ips lab10_mig]
 generate_target all [get_ips lab10_mig]
 
-add_files [glob [file join $repo_dir src common *.v]]
-add_files [glob [file join $repo_dir src bupt_riscv riscv_core *.v]]
-foreach rtl [glob [file join $repo_dir src bupt_riscv *.v]] {
+add_files $common_files
+add_files $core_files
+foreach rtl $soc_files {
     if {[file tail $rtl] ne "ddr_model.v"} {
         add_files $rtl
     }
@@ -31,6 +48,13 @@ launch_runs impl_1 -to_step write_bitstream -jobs 16
 wait_on_run impl_1
 if {[get_property PROGRESS [get_runs impl_1]] != "100%"} {
     error "BUPT RISC-V implementation/bitstream failed"
+}
+
+open_run impl_1
+set failing_paths [get_timing_paths -max_paths 1 -slack_lesser_than 0]
+if {[llength $failing_paths] > 0} {
+    set worst_slack [get_property SLACK [lindex $failing_paths 0]]
+    error "BUPT RISC-V timing failed: worst slack ${worst_slack} ns"
 }
 
 set generated_bit [file join $proj_dir bupt_riscv.runs impl_1 top.bit]
