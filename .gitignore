@@ -2,3 +2,5 @@ build/
 .Xil/
 vivado*.jou
 vivado*.log
+__pycache__/
+*.py[cod]

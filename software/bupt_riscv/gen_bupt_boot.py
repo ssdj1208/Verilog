@@ -6,6 +6,8 @@ BOOT_WORDS = 4096
 
 GPIO_BASE = 0x10000000
 UART_BASE = 0x10001000
+TIMER_BASE = 0x10002000
+IRQ_BASE = 0x10003000
 DDR_STATUS_BASE = 0x10004000
 PERF_BASE = 0x10005000
 CACHE_BASE = 0x10006000
@@ -13,6 +15,9 @@ FP_BASE = 0x10007000
 DEBUG_BASE = 0x10008000
 DDR_BASE = 0x80000000
 BRAM_BASE = 0x00010000
+CMD_BUF = BRAM_BASE + 0x500
+SNAP_BASE = BRAM_BASE + 0x600
+SNAP_CACHE_MISSES = 0x30
 
 UART_TXDATA = 0x0
 UART_RXDATA = 0x4
@@ -143,6 +148,30 @@ def call(target): jal("ra", target)
 def ret(): jalr("zero", 0, "ra")
 
 
+# CSR addresses (machine mode)
+CSR_MSTATUS = 0x300
+CSR_MIE     = 0x304
+CSR_MTVEC   = 0x305
+CSR_MEPC    = 0x341
+CSR_MCAUSE  = 0x342
+CSR_MIP     = 0x344
+MSTATUS_MIE  = 1 << 3
+MSTATUS_MPIE = 1 << 7
+MIE_MEIE     = 1 << 11
+
+
+def _csr(csr, rs1, funct3, rd):
+    return ((csr & 0xFFF) << 20) | (REG[rs1] << 15) | ((funct3 & 7) << 12) | (REG[rd] << 7) | 0x73
+
+def csrrw(rd, csr, rs1): emit(_csr(csr, rs1, 1, rd), f"csrrw {rd},{csr:#x},{rs1}")
+def csrrs(rd, csr, rs1): emit(_csr(csr, rs1, 2, rd), f"csrrs {rd},{csr:#x},{rs1}")
+def csrrc(rd, csr, rs1): emit(_csr(csr, rs1, 3, rd), f"csrrc {rd},{csr:#x},{rs1}")
+def csrrwi(rd, csr, imm): emit(((csr & 0xFFF) << 20) | ((imm & 0x1F) << 15) | (5 << 12) | (REG[rd] << 7) | 0x73, f"csrrwi {rd},{csr:#x},{imm}")
+def csrrsi(rd, csr, imm): emit(((csr & 0xFFF) << 20) | ((imm & 0x1F) << 15) | (6 << 12) | (REG[rd] << 7) | 0x73, f"csrrsi {rd},{csr:#x},{imm}")
+def csrrci(rd, csr, imm): emit(((csr & 0xFFF) << 20) | ((imm & 0x1F) << 15) | (7 << 12) | (REG[rd] << 7) | 0x73, f"csrrci {rd},{csr:#x},{imm}")
+def mret(): emit(0x30200073, "mret")
+
+
 def li(rd, value):
     value &= 0xFFFFFFFF
     hi = (value + 0x800) >> 12
@@ -170,6 +199,64 @@ def expect(reg, value, fail_label="isa_fail"):
 def puts_label(name):
     la("a0", name)
     call("puts")
+
+
+def wait_fp_ready(label_name):
+    label(label_name)
+    lw("t2", 16, "t0")
+    beq("t2", "zero", label_name)
+
+
+def print_perf_field(msg_label, offset):
+    puts_label(msg_label)
+    li("t0", PERF_BASE)
+    lw("a0", offset, "t0")
+    call("print_hex")
+
+
+PERF_SNAPSHOT_FIELDS = [
+    ("msg_cycles", 0),
+    ("msg_retired", 4),
+    ("msg_branch", 8),
+    ("msg_misp", 12),
+    ("msg_stall", 16),
+    ("msg_stall_lu", 20),
+    ("msg_stall_md", 24),
+    ("msg_stall_dc", 28),
+    ("msg_stall_if", 32),
+    ("msg_stall_ddr", 36),
+    ("msg_flush_br", 40),
+    ("msg_flush_tr", 44),
+]
+
+
+def snapshot_perf():
+    li("t0", PERF_BASE)
+    li("t1", SNAP_BASE)
+    for _, offset in PERF_SNAPSHOT_FIELDS:
+        lw("t2", offset, "t0")
+        sw("t2", offset, "t1")
+
+
+def snapshot_cache_misses():
+    li("t0", CACHE_BASE)
+    lw("t2", 8, "t0")
+    li("t1", SNAP_BASE)
+    sw("t2", SNAP_CACHE_MISSES, "t1")
+
+
+def print_snapshot_field(msg_label, offset):
+    puts_label(msg_label)
+    li("t0", SNAP_BASE)
+    lw("a0", offset, "t0")
+    call("print_hex")
+
+
+def print_snapshot_tail(skip_offsets=()):
+    skip = set(skip_offsets)
+    for msg_label, offset in PERF_SNAPSHOT_FIELDS:
+        if offset not in skip:
+            print_snapshot_field(msg_label, offset)
 
 
 label("_start")
@@ -362,7 +449,7 @@ expect("t1", 1, "cache_fail")
 lw("t1", 8, "t3")
 expect("t1", 3, "cache_fail")
 lw("t1", 12, "t3")
-expect("t1", 1, "cache_fail")
+expect("t1", 0, "cache_fail")
 puts_label("msg_cache_ready")
 lw("ra", 0, "sp")
 addi("sp", "sp", 4)
@@ -382,6 +469,7 @@ li("t1", 0x40100000)
 sw("t1", 4, "t0")
 li("t1", 0)
 sw("t1", 8, "t0")
+wait_fp_ready("fp_wait_add")
 lw("t2", 12, "t0")
 expect("t2", 0x40700000, "fp_fail")
 li("t1", 0x3FC00000)
@@ -390,6 +478,7 @@ li("t1", 0x40000000)
 sw("t1", 4, "t0")
 li("t1", 1)
 sw("t1", 8, "t0")
+wait_fp_ready("fp_wait_mul")
 lw("t2", 12, "t0")
 expect("t2", 0x40400000, "fp_fail")
 puts_label("msg_fp_ok")
@@ -410,7 +499,9 @@ beq("s0", "t0", "cmd_help")
 li("t0", ord("m"))
 beq("s0", "t0", "cmd_mem")
 li("t0", ord("p"))
-beq("s0", "t0", "cmd_perf")
+beq("s0", "t0", "cmd_perf_dispatch")
+li("t0", ord("b"))
+beq("s0", "t0", "cmd_bench_dispatch")
 li("t0", ord("c"))
 beq("s0", "t0", "cmd_cache")
 li("t0", ord("f"))
@@ -419,6 +510,20 @@ li("t0", ord("l"))
 beq("s0", "t0", "cmd_led")
 li("t0", ord("r"))
 beq("s0", "t0", "cmd_run")
+li("t0", ord("n"))
+beq("s0", "t0", "cmd_pclr")
+li("t0", ord("a"))
+beq("s0", "t0", "cmd_balu")
+li("t0", ord("e"))
+beq("s0", "t0", "cmd_bmem")
+li("t0", ord("g"))
+beq("s0", "t0", "cmd_bbr")
+li("t0", ord("i"))
+beq("s0", "t0", "cmd_int_dispatch")
+li("t0", ord("o"))
+beq("s0", "t0", "cmd_intoff")
+li("t0", ord("t"))
+beq("s0", "t0", "cmd_intstat")
 j("cmd_help")
 
 label("cmd_help")
@@ -459,24 +564,31 @@ call("print_prompt")
 j("shell_loop")
 
 label("cmd_perf")
-puts_label("msg_cycles")
-li("t0", PERF_BASE)
-lw("a0", 0, "t0")
-call("print_hex")
-puts_label("msg_retired")
-lw("a0", 4, "t0")
-call("print_hex")
-puts_label("msg_branch")
-lw("a0", 8, "t0")
-call("print_hex")
-puts_label("msg_misp")
-lw("a0", 12, "t0")
-call("print_hex")
-puts_label("msg_stall")
-lw("a0", 16, "t0")
-call("print_hex")
+print_perf_field("msg_cycles", 0)
+print_perf_field("msg_retired", 4)
+print_perf_field("msg_branch", 8)
+print_perf_field("msg_misp", 12)
+print_perf_field("msg_stall", 16)
+print_perf_field("msg_stall_lu", 20)
+print_perf_field("msg_stall_md", 24)
+print_perf_field("msg_stall_dc", 28)
+print_perf_field("msg_stall_if", 32)
+print_perf_field("msg_stall_ddr", 36)
+print_perf_field("msg_flush_br", 40)
+print_perf_field("msg_flush_tr", 44)
 call("print_prompt")
 j("shell_loop")
+
+label("cmd_perf_dispatch")
+li("t0", CMD_BUF + 1)
+lbu("t1", 0, "t0")
+li("t2", ord("c"))
+beq("t1", "t2", "cmd_pclr")
+li("t0", CMD_BUF + 5)
+lbu("t1", 0, "t0")
+li("t2", ord("c"))
+beq("t1", "t2", "cmd_pclr")
+j("cmd_perf")
 
 label("cmd_cache_stats")
 puts_label("msg_cache_hits")
@@ -484,6 +596,209 @@ li("t0", CACHE_BASE)
 lw("a0", 4, "t0")
 call("print_hex")
 j("shell_loop")
+
+label("cmd_bench_dispatch")
+li("t0", CMD_BUF + 1)
+lbu("t1", 0, "t0")
+li("t2", ord("a"))
+beq("t1", "t2", "cmd_balu")
+li("t2", ord("m"))
+beq("t1", "t2", "cmd_bmem")
+li("t2", ord("b"))
+beq("t1", "t2", "cmd_bbr")
+li("t0", CMD_BUF + 6)
+lbu("t1", 0, "t0")
+li("t2", ord("a"))
+beq("t1", "t2", "cmd_balu")
+li("t2", ord("m"))
+beq("t1", "t2", "cmd_bmem")
+li("t2", ord("b"))
+beq("t1", "t2", "cmd_bbr")
+j("cmd_help")
+
+label("cmd_pclr")
+li("t0", PERF_BASE)
+li("t1", 1)
+sw("t1", 0x1c, "t0")
+puts_label("msg_ok")
+call("print_prompt")
+j("shell_loop")
+
+label("cmd_balu")
+addi("sp", "sp", -4)
+sw("ra", 0, "sp")
+li("t0", PERF_BASE)
+li("t1", 1)
+sw("t1", 0x1c, "t0")
+li("s0", 1000)
+li("s1", 0)
+label("balu_loop")
+addi("t0", "s1", 7)
+sub("t1", "t0", "s0")
+and_("t2", "t0", "t1")
+or_("t3", "t2", "t1")
+xor("t4", "t3", "t2")
+slli("t5", "t4", 2)
+mul("s1", "t5", "t0")
+addi("s0", "s0", -1)
+bne("s0", "zero", "balu_loop")
+snapshot_perf()
+print_snapshot_field("msg_balu", 0)
+print_snapshot_tail(skip_offsets={0})
+lw("ra", 0, "sp")
+addi("sp", "sp", 4)
+call("print_prompt")
+j("shell_loop")
+
+label("cmd_bmem")
+addi("sp", "sp", -4)
+sw("ra", 0, "sp")
+li("t0", PERF_BASE)
+li("t1", 1)
+sw("t1", 0x1c, "t0")
+li("t0", CACHE_BASE)
+li("t1", 1)
+sw("t1", 0x1c, "t0")
+li("t0", DDR_BASE)
+li("s0", 256)
+li("s1", 0)
+label("bmem_write")
+sw("s1", 0, "t0")
+addi("t0", "t0", 4)
+addi("s1", "s1", 1)
+addi("s0", "s0", -1)
+bne("s0", "zero", "bmem_write")
+li("t0", DDR_BASE)
+li("s0", 256)
+label("bmem_read")
+lw("t1", 0, "t0")
+addi("t0", "t0", 4)
+addi("s0", "s0", -1)
+bne("s0", "zero", "bmem_read")
+snapshot_perf()
+snapshot_cache_misses()
+print_snapshot_field("msg_bmem", 0)
+print_snapshot_tail(skip_offsets={0})
+print_snapshot_field("msg_misses", SNAP_CACHE_MISSES)
+lw("ra", 0, "sp")
+addi("sp", "sp", 4)
+call("print_prompt")
+j("shell_loop")
+
+label("cmd_bbr")
+addi("sp", "sp", -4)
+sw("ra", 0, "sp")
+li("t0", PERF_BASE)
+li("t1", 1)
+sw("t1", 0x1c, "t0")
+li("s0", 200)
+label("bbr_outer")
+li("s1", 8)
+label("bbr_inner")
+beq("zero", "zero", "bbr_l1")
+label("bbr_l1")
+bne("zero", "zero", "bbr_l2")
+label("bbr_l2")
+andi("t2", "s1", 1)
+beq("t2", "zero", "bbr_l3")
+label("bbr_l3")
+addi("s1", "s1", -1)
+bne("s1", "zero", "bbr_inner")
+addi("s0", "s0", -1)
+bne("s0", "zero", "bbr_outer")
+snapshot_perf()
+print_snapshot_field("msg_bbr", 8)
+print_snapshot_field("msg_misp", 12)
+print_snapshot_tail(skip_offsets={8, 12})
+lw("ra", 0, "sp")
+addi("sp", "sp", 4)
+call("print_prompt")
+j("shell_loop")
+
+label("cmd_inton")
+addi("sp", "sp", -4)
+sw("ra", 0, "sp")
+la("t0", "irq_handler")
+csrrw("zero", CSR_MTVEC, "t0")
+li("t0", MIE_MEIE)
+csrrs("zero", CSR_MIE, "t0")
+li("t0", MSTATUS_MIE)
+csrrs("zero", CSR_MSTATUS, "t0")
+li("t0", TIMER_BASE)
+li("t1", 1)
+sw("t1", 0x0c, "t0")
+li("t1", 0x7)
+sw("t1", 0x08, "t0")
+puts_label("msg_int_on")
+lw("ra", 0, "sp")
+addi("sp", "sp", 4)
+call("print_prompt")
+j("shell_loop")
+
+label("cmd_int_dispatch")
+li("t0", CMD_BUF + 1)
+lbu("t1", 0, "t0")
+beq("t1", "zero", "cmd_inton")
+li("t0", CMD_BUF + 4)
+lbu("t1", 0, "t0")
+li("t2", ord("s"))
+beq("t1", "t2", "cmd_intstat")
+li("t2", ord("o"))
+beq("t1", "t2", "cmd_int_o_dispatch")
+j("cmd_inton")
+
+label("cmd_int_o_dispatch")
+li("t0", CMD_BUF + 5)
+lbu("t1", 0, "t0")
+li("t2", ord("f"))
+beq("t1", "t2", "cmd_intoff")
+j("cmd_inton")
+
+label("cmd_intoff")
+li("t0", MSTATUS_MIE)
+csrrc("zero", CSR_MSTATUS, "t0")
+puts_label("msg_int_off")
+call("print_prompt")
+j("shell_loop")
+
+label("cmd_intstat")
+addi("sp", "sp", -4)
+sw("ra", 0, "sp")
+puts_label("msg_tick")
+li("t0", BRAM_BASE + 0x400)
+lw("a0", 0, "t0")
+call("print_hex")
+puts_label("msg_pending")
+li("t0", IRQ_BASE)
+lw("a0", 0, "t0")
+call("print_hex")
+lw("ra", 0, "sp")
+addi("sp", "sp", 4)
+call("print_prompt")
+j("shell_loop")
+
+label("irq_handler")
+addi("sp", "sp", -16)
+sw("t0", 0, "sp")
+sw("t1", 4, "sp")
+sw("t2", 8, "sp")
+li("t0", BRAM_BASE + 0x400)
+lw("t1", 0, "t0")
+addi("t1", "t1", 1)
+sw("t1", 0, "t0")
+li("t0", GPIO_BASE)
+lw("t1", 0, "t0")
+li("t2", 2)
+xor("t1", "t1", "t2")
+sw("t1", 0, "t0")
+li("t0", TIMER_BASE)
+li("t1", 1)
+sw("t1", 0x0c, "t0")
+lw("t0", 0, "sp")
+lw("t1", 4, "sp")
+lw("t2", 8, "sp")
+addi("sp", "sp", 16)
+mret()
 
 label("print_prompt")
 addi("sp", "sp", -4)
@@ -532,6 +847,16 @@ ret()
 label("consume_line")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
+li("t3", CMD_BUF)
+li("t4", 32)
+label("consume_clear_loop")
+sb("zero", 0, "t3")
+addi("t3", "t3", 1)
+addi("t4", "t4", -1)
+bne("t4", "zero", "consume_clear_loop")
+li("t3", CMD_BUF)
+sb("s0", 0, "t3")
+addi("t3", "t3", 1)
 li("t2", 13)
 beq("s0", "t2", "consume_done")
 li("t2", 10)
@@ -542,8 +867,12 @@ li("t2", 13)
 beq("a0", "t2", "consume_done")
 li("t2", 10)
 beq("a0", "t2", "consume_done")
+sb("a0", 0, "t3")
+addi("t3", "t3", 1)
 j("consume_loop")
 label("consume_done")
+li("t2", 0)
+sb("t2", 0, "t3")
 lw("ra", 0, "sp")
 addi("sp", "sp", 4)
 ret()
@@ -585,12 +914,13 @@ def bytes_label(name, text):
         emit(0, "pad")
     labels[name] = len(prog) * 4
     data = text.encode("ascii") + b"\0"
+    display_text = text.encode("unicode_escape").decode("ascii")
     for idx in range(0, len(data), 4):
         chunk = data[idx:idx + 4]
         word = 0
         for bidx, val in enumerate(chunk):
             word |= val << (8 * bidx)
-        emit(word, f'.ascii "{text}"')
+        emit(word, f'.ascii "{display_text}"')
 
 
 bytes_label("msg_banner", "BUPT RISC-V CPU PROJECT\r\n")
@@ -605,7 +935,7 @@ bytes_label("msg_fp_ok", "FP TEST OK\r\n")
 bytes_label("msg_fp_fail", "FP TEST FAIL\r\n")
 bytes_label("msg_perf_ready", "PERF READY\r\n")
 bytes_label("msg_prompt", "rv32> ")
-bytes_label("msg_help", "help mem perf cache fp led run\r\n")
+bytes_label("msg_help", "help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat\r\n")
 bytes_label("msg_ok", "OK\r\n")
 bytes_label("msg_demo", "demo started\r\n")
 bytes_label("msg_cycles", "cycles=")
@@ -613,7 +943,22 @@ bytes_label("msg_retired", "retired=")
 bytes_label("msg_branch", "branches=")
 bytes_label("msg_misp", "mispredicts=")
 bytes_label("msg_stall", "stalls=")
+bytes_label("msg_stall_lu", "stall_lu=")
+bytes_label("msg_stall_md", "stall_md=")
+bytes_label("msg_stall_dc", "stall_dc=")
+bytes_label("msg_stall_if", "stall_if=")
+bytes_label("msg_stall_ddr", "stall_ddr=")
+bytes_label("msg_flush_br", "flush_br=")
+bytes_label("msg_flush_tr", "flush_tr=")
 bytes_label("msg_cache_hits", "cache_hits=")
+bytes_label("msg_balu", "BALU cycles=")
+bytes_label("msg_bmem", "BMEM cycles=")
+bytes_label("msg_bbr", "BBR branches=")
+bytes_label("msg_misses", "misses=")
+bytes_label("msg_int_on", "INT ON\r\n")
+bytes_label("msg_int_off", "INT OFF\r\n")
+bytes_label("msg_tick", "tick=")
+bytes_label("msg_pending", "pending=")
 bytes_label("msg_dbg_pc", "branch_pc=")
 bytes_label("msg_dbg_srca", "branch_srca=")
 bytes_label("msg_dbg_srcb", "branch_srcb=")

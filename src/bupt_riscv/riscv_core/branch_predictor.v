@@ -7,36 +7,41 @@ module branch_predictor(
     output wire pred_takenF,
     output wire[31:0] pred_targetF,
     input wire updateE,
+    input wire invalidateE,
     input wire[31:0] pcE,
     input wire takenE,
     input wire[31:0] targetE
     );
 
-    reg valid[0:63];
-    reg[23:0] tag[0:63];
-    reg[31:0] target[0:63];
-    reg[1:0] counter[0:63];
+    reg valid[0:127];
+    reg[22:0] tag[0:127];
+    reg[31:0] target[0:127];
+    reg[1:0] counter[0:127];
     integer i;
 
-    wire[5:0] idxF = pcF[7:2];
-    wire[23:0] tagF = pcF[31:8];
-    wire[5:0] idxE = pcE[7:2];
-    wire[23:0] tagE = pcE[31:8];
+    wire[6:0] idxF = pcF[8:2];
+    wire[6:0] idxE = pcE[8:2];
+    wire tag_matchF = valid[idxF] && (tag[idxF] == pcF[31:9]);
+    wire tag_matchE = valid[idxE] && (tag[idxE] == pcE[31:9]);
 
-    assign pred_takenF = valid[idxF] && (tag[idxF] == tagF) && counter[idxF][1];
+    assign pred_takenF = tag_matchF && counter[idxF][1];
     assign pred_targetF = target[idxF];
 
     always @(posedge clk) begin
         if (rst) begin
-            for (i = 0; i < 64; i = i + 1) begin
+            for (i = 0; i < 128; i = i + 1) begin
                 valid[i] <= 1'b0;
-                tag[i] <= 24'b0;
+                tag[i] <= 23'b0;
                 target[i] <= 32'b0;
                 counter[i] <= 2'b01;
             end
+        end else if (invalidateE) begin
+            // A non-branch instruction was fetched at a PC whose BTB entry
+            // falsely predicted taken. Drop the matching entry.
+            if (tag_matchE) valid[idxE] <= 1'b0;
         end else if (updateE) begin
             valid[idxE] <= 1'b1;
-            tag[idxE] <= tagE;
+            tag[idxE] <= pcE[31:9];
             target[idxE] <= targetE;
             if (takenE) begin
                 if (counter[idxE] != 2'b11) counter[idxE] <= counter[idxE] + 2'b01;

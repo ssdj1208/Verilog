@@ -9,8 +9,19 @@ create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports { c
 ## bus clock and the MIG UI clock. Multi-bit payload registers are held stable
 ## until the synchronized toggle is acknowledged, so these crossings are CDC
 ## paths rather than single-cycle synchronous timing paths.
+set_false_path -from [get_clocks -quiet clk50_unbuf] -to [get_clocks -quiet clk_pll_i]
+set_false_path -from [get_clocks -quiet clk_pll_i] -to [get_clocks -quiet clk50_unbuf]
 set_false_path -from [get_clocks -quiet clk50_180_unbuf] -to [get_clocks -quiet clk_pll_i]
 set_false_path -from [get_clocks -quiet clk_pll_i] -to [get_clocks -quiet clk50_180_unbuf]
+
+## FP MMIO exposes a software-polled ready bit and only publishes the result
+## after the operands have been stable for three clk50 cycles.
+set fp_launch_regs [get_cells -quiet -hier -regexp {.*soc/bus/fp/(op_[ab]|op_sel)_reg\[[0-9]+\]}]
+set fp_result_regs [get_cells -quiet -hier -regexp {.*soc/bus/fp/result_reg_reg\[[0-9]+\]}]
+set fp_launch_pins [get_pins -quiet -of_objects $fp_launch_regs -filter {REF_PIN_NAME == C}]
+set fp_capture_pins [get_pins -quiet -of_objects $fp_result_regs -filter {REF_PIN_NAME == D}]
+set_multicycle_path 3 -setup -from $fp_launch_pins -to $fp_capture_pins
+set_multicycle_path 2 -hold  -from $fp_launch_pins -to $fp_capture_pins
 
 ## Center button as reset
 set_property -dict { PACKAGE_PIN N17 IOSTANDARD LVCMOS33 } [get_ports { rst }]

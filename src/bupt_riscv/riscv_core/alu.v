@@ -27,12 +27,6 @@ module alu(
     localparam ALU_REM   = 5'd17;
     localparam ALU_REMU  = 5'd18;
 
-    wire signed[31:0] as = a;
-    wire signed[31:0] bs = b;
-    wire signed[63:0] mul_ss = as * bs;
-    wire[63:0] mul_uu = a * b;
-    wire signed[63:0] mul_su = as * $signed({1'b0, b});
-
     always @(*) begin
         case (op)
             ALU_ADD:   y = a + b;
@@ -46,10 +40,10 @@ module alu(
             ALU_OR:    y = a | b;
             ALU_AND:   y = a & b;
             ALU_COPYB: y = b;
-            ALU_MUL:   y = mul_ss[31:0];
-            ALU_MULH:  y = mul_ss[63:32];
-            ALU_MULHSU: y = mul_su[63:32];
-            ALU_MULHU: y = mul_uu[63:32];
+            ALU_MUL,
+            ALU_MULH,
+            ALU_MULHSU,
+            ALU_MULHU,
             ALU_DIV,
             ALU_DIVU,
             ALU_REM,

@@ -43,10 +43,10 @@ module clk_100_to_200(
         .CLKOUT0_DIVIDE_F(5.000),
         .CLKOUT0_PHASE(0.000),
         .CLKOUT0_DUTY_CYCLE(0.500),
-        .CLKOUT1_DIVIDE(20),
+        .CLKOUT1_DIVIDE(10),  // 1000/10 = 100 MHz CPU/bus clock
         .CLKOUT1_PHASE(0.000),
         .CLKOUT1_DUTY_CYCLE(0.500),
-        .CLKOUT2_DIVIDE(20),
+        .CLKOUT2_DIVIDE(10),
         .CLKOUT2_PHASE(180.000),
         .CLKOUT2_DUTY_CYCLE(0.500),
         .STARTUP_WAIT("FALSE")

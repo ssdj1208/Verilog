@@ -109,7 +109,7 @@ module top(
     reg[3:0] rst_sync;
     wire soc_rst;
     wire soc_clk = clk50mhz;
-    wire bus_clk = clk50mhz_180;
+    wire bus_clk = clk50mhz;
     wire backend_clk = ui_clk;
 
     always @(posedge soc_clk or posedge por_rst) begin
@@ -150,8 +150,8 @@ module top(
     wire uart_rx_valid;
 
     soc #(
-        .UART_CLKS_PER_BIT(434),
-        .TIMER_TICK_CYCLES(32'd500000)
+        .UART_CLKS_PER_BIT(868),       // 100 MHz / 115200 baud
+        .TIMER_TICK_CYCLES(32'd1000000) // ~10 ms at 100 MHz
     ) soc(
         .clk(soc_clk),
         .bus_clk(bus_clk),

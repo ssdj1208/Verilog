@@ -31,6 +31,7 @@ module soc #(
 
     wire[31:0] pc;
     wire[31:0] instr;
+    wire i_ready;
     wire memvalid;
     wire memready;
     wire memwrite;
@@ -44,6 +45,12 @@ module soc #(
     wire perf_branchE;
     wire perf_mispredictE;
     wire perf_stall;
+    wire perf_stall_loaduse;
+    wire perf_stall_muldiv;
+    wire perf_stall_dcache;
+    wire perf_stall_ifetch;
+    wire perf_flush_branch;
+    wire perf_flush_trap;
     wire[31:0] debug_branch_pc;
     wire[31:0] debug_branch_srca;
     wire[31:0] debug_branch_srcb;
@@ -52,8 +59,10 @@ module soc #(
     riscv cpu(
         .clk(clk),
         .rst(rst),
+        .irq(irq_lines),
         .pcF(pc),
         .instrF(instr),
+        .i_readyF(i_ready),
         .d_validM(memvalid),
         .d_readyM(memready),
         .memwriteM(memwrite),
@@ -65,6 +74,12 @@ module soc #(
         .perf_branchE(perf_branchE),
         .perf_mispredictE(perf_mispredictE),
         .perf_stall(perf_stall),
+        .perf_stall_loaduse(perf_stall_loaduse),
+        .perf_stall_muldiv(perf_stall_muldiv),
+        .perf_stall_dcache(perf_stall_dcache),
+        .perf_stall_ifetch(perf_stall_ifetch),
+        .perf_flush_branch(perf_flush_branch),
+        .perf_flush_trap(perf_flush_trap),
         .debug_branch_pc(debug_branch_pc),
         .debug_branch_srca(debug_branch_srca),
         .debug_branch_srcb(debug_branch_srcb),
@@ -80,6 +95,7 @@ module soc #(
         .rst(rst),
         .i_addr(pc),
         .i_rdata(instr),
+        .i_ready(i_ready),
         .d_valid(memvalid),
         .d_ready(memready),
         .d_we(memwrite),
@@ -107,6 +123,12 @@ module soc #(
         .perf_branchE(perf_branchE),
         .perf_mispredictE(perf_mispredictE),
         .perf_stall(perf_stall),
+        .perf_stall_loaduse(perf_stall_loaduse),
+        .perf_stall_muldiv(perf_stall_muldiv),
+        .perf_stall_dcache(perf_stall_dcache),
+        .perf_stall_ifetch(perf_stall_ifetch),
+        .perf_flush_branch(perf_flush_branch),
+        .perf_flush_trap(perf_flush_trap),
         .debug_branch_pc(debug_branch_pc),
         .debug_branch_srca(debug_branch_srca),
         .debug_branch_srcb(debug_branch_srcb),

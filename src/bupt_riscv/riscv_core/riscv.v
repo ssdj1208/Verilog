@@ -3,8 +3,10 @@
 module riscv(
     input wire clk,
     input wire rst,
+    input wire [7:0] irq,
     output wire[31:0] pcF,
     input wire[31:0] instrF,
+    input wire i_readyF,
     output wire d_validM,
     input wire d_readyM,
     output wire memwriteM,
@@ -16,6 +18,12 @@ module riscv(
     output wire perf_branchE,
     output wire perf_mispredictE,
     output wire perf_stall,
+    output wire perf_stall_loaduse,
+    output wire perf_stall_muldiv,
+    output wire perf_stall_dcache,
+    output wire perf_stall_ifetch,
+    output wire perf_flush_branch,
+    output wire perf_flush_trap,
     output reg[31:0] debug_branch_pc,
     output reg[31:0] debug_branch_srca,
     output reg[31:0] debug_branch_srcb,
@@ -25,6 +33,7 @@ module riscv(
     localparam WB_ALU = 2'b00;
     localparam WB_MEM = 2'b01;
     localparam WB_PC4 = 2'b10;
+    localparam WB_CSR = 2'b11;
 
     localparam ALU_ADD  = 4'd0;
     localparam ALU_SUB  = 4'd1;
@@ -53,16 +62,50 @@ module riscv(
     wire memstallM;
     wire divstallE;
     wire idex_en;
+    wire validE;
 
     wire[31:0] pcplus4F = pcF + 32'd4;
     wire pred_takenF;
     wire[31:0] pred_targetF;
     wire redirectE;
     wire[31:0] redirect_targetE;
-    wire[31:0] pcnextF = redirectE ? redirect_targetE :
-                          pred_takenF ? pred_targetF : pcplus4F;
+    wire bp_invalidateE;
+    wire ifetch_stall = ~i_readyF;
+    reg redirect_pendingR;
+    reg[31:0] redirect_targetR;
+    reg fetch_redirectR;
+    reg[31:0] fetch_redirect_targetR;
+    wire fetch_redirectF = fetch_redirectR & ~stallD;
 
-    pc #(32) pcreg(clk, rst, ~stallF & ~memstallM, pcnextF, pcF);
+    // ---- Machine-mode CSR / trap state (declared early, used by pcnextF) ----
+    reg [31:0] mtvec;
+    reg [31:0] mepc;
+    reg [31:0] mcause;
+    reg [31:0] mstatus;   // only MIE[3] and MPIE[7] used
+    reg [31:0] mie;       // only MEIE[11] used
+    wire mstatus_mie  = mstatus[3];
+    wire mstatus_mpie = mstatus[7];
+    wire meie = mie[11];
+    wire irq_pending = (|irq) & meie;
+    // trap/mret are taken only when EX holds a real instruction. On trap the
+    // EX instruction is squashed before MEM, so mepc=pcE replays it precisely.
+    wire trap_can_take = validE & ~memstallM & ~divstallE & ~rst;
+    wire trap_take  = mstatus_mie & irq_pending & trap_can_take;
+    wire mret_take;        // assigned in EX section
+    wire trap_redirect = trap_take;
+    wire mret_redirect = mret_take;
+    wire trap_flush = (trap_take | mret_take);
+    wire pc_redirectF = redirectE | trap_flush | fetch_redirectF;
+    wire pc_fetch_holdF = ifetch_stall & ~pc_redirectF;
+    wire[31:0] pcseqF = pc_fetch_holdF ? pcF : pcplus4F;
+
+    wire[31:0] pcnextF = trap_redirect ? mtvec :
+                         mret_redirect ? mepc :
+                         redirectE ? redirect_targetR :
+                         fetch_redirectF ? fetch_redirect_targetR : pcseqF;
+
+    wire pc_en = ((~stallD) | pc_redirectF) & ~memstallM;
+    pc #(32) pcreg(clk, rst, pc_en, pcnextF, pcF);
 
     // IF/ID
     wire[31:0] instrD;
@@ -72,12 +115,33 @@ module riscv(
     wire[31:0] pred_targetD;
     wire validD;
 
-    flopenrc #(32) ifid_instr(clk, rst, ~stallD & ~memstallM, flushD, instrF, instrD);
-    flopenrc #(32) ifid_pc(clk, rst, ~stallD & ~memstallM, flushD, pcF, pcD);
-    flopenrc #(32) ifid_pc4(clk, rst, ~stallD & ~memstallM, flushD, pcplus4F, pcplus4D);
-    flopenrc #(1)  ifid_pred_taken(clk, rst, ~stallD & ~memstallM, flushD, pred_takenF, pred_takenD);
-    flopenrc #(32) ifid_pred_target(clk, rst, ~stallD & ~memstallM, flushD, pred_targetF, pred_targetD);
-    flopenrc #(1)  ifid_valid(clk, rst, ~stallD & ~memstallM, flushD, 1'b1, validD);
+    wire ifid_en = ~stallD & ~memstallM;
+    wire fetch_validF = i_readyF;
+    wire ifid_acceptF = ifid_en & fetch_validF;
+    flopenrc #(32) ifid_instr(clk, rst, ifid_en, flushD, fetch_validF ? instrF : 32'b0, instrD);
+    flopenrc #(32) ifid_pc(clk, rst, ifid_en, flushD, fetch_validF ? pcF : 32'b0, pcD);
+    flopenrc #(32) ifid_pc4(clk, rst, ifid_en, flushD, fetch_validF ? pcplus4F : 32'b0, pcplus4D);
+    flopenrc #(1)  ifid_pred_taken(clk, rst, ifid_en, flushD, fetch_validF ? pred_takenF : 1'b0, pred_takenD);
+    flopenrc #(32) ifid_pred_target(clk, rst, ifid_en, flushD, fetch_validF ? pred_targetF : 32'b0, pred_targetD);
+    flopenrc #(1)  ifid_valid(clk, rst, ifid_en, flushD, fetch_validF, validD);
+
+    always @(posedge clk) begin
+        if (rst) begin
+            fetch_redirectR <= 1'b0;
+            fetch_redirect_targetR <= 32'b0;
+        end else if (trap_flush | redirectE) begin
+            fetch_redirectR <= 1'b0;
+            fetch_redirect_targetR <= 32'b0;
+        end else if (~memstallM) begin
+            if (fetch_redirectF) begin
+                fetch_redirectR <= 1'b0;
+                fetch_redirect_targetR <= 32'b0;
+            end else if (ifid_acceptF) begin
+                fetch_redirectR <= pred_takenF;
+                fetch_redirect_targetR <= pred_targetF;
+            end
+        end
+    end
 
     wire[6:0] opcodeD = instrD[6:0];
     wire[2:0] funct3D = instrD[14:12];
@@ -112,6 +176,10 @@ module riscv(
     reg uses_rs2D;
     reg[2:0] load_funct3D;
     reg[2:0] store_funct3D;
+    reg csr_weD;
+    reg[2:0] csr_opD;   // funct3 of CSR op (001 w, 010 s, 011 c, 1xx imm)
+    reg csr_immD;       // 1 if immediate form (csrrwi/si/ci)
+    reg mretD;
 
     always @(*) begin
         regwriteD = 1'b0;
@@ -129,6 +197,10 @@ module riscv(
         uses_rs2D = 1'b0;
         load_funct3D = funct3D;
         store_funct3D = funct3D;
+        csr_weD = 1'b0;
+        csr_opD = 3'b000;
+        csr_immD = 1'b0;
+        mretD = 1'b0;
 
         case (opcodeD)
             7'b0110111: begin // lui
@@ -219,6 +291,22 @@ module riscv(
                     endcase
                 end
             end
+            7'b1110011: begin // SYSTEM: CSR instructions / mret
+                if (funct3D == 3'b000) begin
+                    if (instrD == 32'h30200073) begin
+                        mretD = 1'b1;          // mret
+                    end else begin
+                        illegalD = 1'b1;       // ecall/ebreak not supported yet
+                    end
+                end else begin
+                    regwriteD = 1'b1;
+                    wbselD = WB_CSR;
+                    csr_weD = 1'b1;
+                    csr_opD = funct3D;
+                    csr_immD = funct3D[2];
+                    uses_rs1D = ~funct3D[2];
+                end
+            end
             default: begin
                 illegalD = (instrD != 32'b0);
             end
@@ -229,11 +317,41 @@ module riscv(
     wire[31:0] pcE, pcplus4E, rd1E, rd2E, immE;
     wire[4:0] rs1E, rs2E, rdE;
     wire[2:0] funct3E, load_funct3E, store_funct3E;
-    wire regwriteE, memreadE, memwriteE, alusrcE, branchE, jumpE, jalrE, validE;
+    wire regwriteE, memreadE, memwriteE, alusrcE, branchE, jumpE, jalrE;
     wire[1:0] wbselE, srca_selE;
     wire[4:0] alucontrolE;
     wire pred_takenE;
     wire[31:0] pred_targetE;
+    wire csr_weE, csr_immE, mretE;
+    wire[2:0] csr_opE;
+    wire[11:0] csr_addrE;
+    wire[4:0] zimmE;
+
+    wire regwriteM;
+    wire memreadM;
+    wire[1:0] wbselM;
+    wire[4:0] rdM;
+    wire[31:0] pcplus4M;
+    wire[31:0] aluResultM;
+    wire[31:0] resultM;
+
+    wire[31:0] aluoutW;
+    wire[31:0] pcplus4W;
+    wire[1:0] wbselW;
+    wire[31:0] loadDataW;
+
+    wire[1:0] forwardaD =
+        (rs1D != 5'b0) ?
+            ((rs1D == rdE) && regwriteE && validE && (wbselE != WB_MEM)) ? 2'b10 :
+            ((rs1D == rdM) && regwriteM)                                ? 2'b01 : 2'b00
+        : 2'b00;
+    wire[1:0] forwardbD =
+        (rs2D != 5'b0) ?
+            ((rs2D == rdE) && regwriteE && validE && (wbselE != WB_MEM)) ? 2'b10 :
+            ((rs2D == rdM) && regwriteM)                                ? 2'b01 : 2'b00
+        : 2'b00;
+    wire[1:0] forwardaE;
+    wire[1:0] forwardbE;
 
     assign idex_en = ~memstallM & ~divstallE;
 
@@ -261,37 +379,14 @@ module riscv(
     flopenrc #(1)  idex_pred_taken(clk, rst, idex_en, flushE, pred_takenD, pred_takenE);
     flopenrc #(32) idex_pred_target(clk, rst, idex_en, flushE, pred_targetD, pred_targetE);
     flopenrc #(1)  idex_valid(clk, rst, idex_en, flushE, validD & ~illegalD, validE);
-
-    wire regwriteM;
-    wire memreadM;
-    wire[1:0] wbselM;
-    wire[4:0] rdM;
-    wire[31:0] pcplus4M;
-    wire[31:0] aluResultM;
-    wire[31:0] resultM = (wbselM == WB_PC4) ? pcplus4M : aluResultM;
-    wire memtoregM = (wbselM == WB_MEM);
-
-    wire[31:0] aluoutW;
-    wire[31:0] readdataW;
-    wire[31:0] pcplus4W;
-    wire[1:0] wbselW;
-    wire[2:0] load_funct3W;
-    wire[1:0] load_addrW;
-
-    reg[1:0] forwardaE;
-    reg[1:0] forwardbE;
-    always @(*) begin
-        forwardaE = 2'b00;
-        forwardbE = 2'b00;
-        if (rs1E != 5'b0) begin
-            if ((rs1E == rdM) && regwriteM && ~memtoregM) forwardaE = 2'b10;
-            else if ((rs1E == rdW) && regwriteW) forwardaE = 2'b01;
-        end
-        if (rs2E != 5'b0) begin
-            if ((rs2E == rdM) && regwriteM && ~memtoregM) forwardbE = 2'b10;
-            else if ((rs2E == rdW) && regwriteW) forwardbE = 2'b01;
-        end
-    end
+    flopenrc #(1)  idex_csr_we(clk, rst, idex_en, flushE, csr_weD & ~illegalD & validD, csr_weE);
+    flopenrc #(3)  idex_csr_op(clk, rst, idex_en, flushE, csr_opD, csr_opE);
+    flopenrc #(1)  idex_csr_imm(clk, rst, idex_en, flushE, csr_immD, csr_immE);
+    flopenrc #(1)  idex_mret(clk, rst, idex_en, flushE, mretD & ~illegalD & validD, mretE);
+    flopenrc #(12) idex_csr_addr(clk, rst, idex_en, flushE, instrD[31:20], csr_addrE);
+    flopenrc #(5)  idex_zimm(clk, rst, idex_en, flushE, instrD[19:15], zimmE);
+    flopenrc #(2)  idex_forwarda(clk, rst, idex_en, flushE, forwardaD, forwardaE);
+    flopenrc #(2)  idex_forwardb(clk, rst, idex_en, flushE, forwardbD, forwardbE);
 
     wire[31:0] srca_forwardE = (forwardaE == 2'b10) ? resultM :
                                 (forwardaE == 2'b01) ? resultW : rd1E;
@@ -304,6 +399,35 @@ module riscv(
     wire[31:0] aluResultE;
     alu alu(aluSrcAE, aluSrcBE, alucontrolE, aluResultE);
 
+    wire mul_opE = validE & ((alucontrolE == ALU_MUL) ||
+                             (alucontrolE == ALU_MULH) ||
+                             (alucontrolE == ALU_MULHSU) ||
+                             (alucontrolE == ALU_MULHU));
+    wire mul_signed_aE = (alucontrolE == ALU_MUL) ||
+                         (alucontrolE == ALU_MULH) ||
+                         (alucontrolE == ALU_MULHSU);
+    wire mul_signed_bE = (alucontrolE == ALU_MUL) ||
+                         (alucontrolE == ALU_MULH);
+    wire mul_highE = (alucontrolE != ALU_MUL);
+    wire mul_busy;
+    wire mul_ready;
+    wire[31:0] mul_resultE;
+    wire mul_startE = mul_opE & ~mul_busy & ~mul_ready & ~memstallM;
+
+    iter_mul mul_unit(
+        .clk(clk),
+        .rst(rst),
+        .start(mul_startE),
+        .signed_a(mul_signed_aE),
+        .signed_b(mul_signed_bE),
+        .high_word(mul_highE),
+        .a_i(srca_forwardE),
+        .b_i(srcb_forwardE),
+        .busy(mul_busy),
+        .ready(mul_ready),
+        .result(mul_resultE)
+        );
+
     wire div_opE = validE & ((alucontrolE == ALU_DIV) ||
                              (alucontrolE == ALU_DIVU) ||
                              (alucontrolE == ALU_REM) ||
@@ -314,7 +438,7 @@ module riscv(
     wire div_ready;
     wire[31:0] div_resultE;
     wire div_startE = div_opE & ~div_busy & ~div_ready & ~memstallM;
-    assign divstallE = div_opE & ~div_ready;
+    assign divstallE = (div_opE & ~div_ready) | (mul_opE & ~mul_ready);
 
     iter_div div_unit(
         .clk(clk),
@@ -329,30 +453,111 @@ module riscv(
         .result(div_resultE)
         );
 
-    wire[31:0] executeResultE = div_opE ? div_resultE : aluResultE;
+    wire[31:0] executeResultE = div_opE ? div_resultE :
+                                mul_opE ? mul_resultE : aluResultE;
 
-    reg branch_takenE;
-    always @(*) begin
-        case (funct3E)
-            3'b000: branch_takenE = (srca_forwardE == srcb_forwardE);
-            3'b001: branch_takenE = (srca_forwardE != srcb_forwardE);
-            3'b100: branch_takenE = ($signed(srca_forwardE) < $signed(srcb_forwardE));
-            3'b101: branch_takenE = ($signed(srca_forwardE) >= $signed(srcb_forwardE));
-            3'b110: branch_takenE = (srca_forwardE < srcb_forwardE);
-            3'b111: branch_takenE = (srca_forwardE >= srcb_forwardE);
-            default: branch_takenE = 1'b0;
-        endcase
-    end
+    wire branch_takenE =
+        (funct3E == 3'b000) ? (srca_forwardE == srcb_forwardE) :
+        (funct3E == 3'b001) ? (srca_forwardE != srcb_forwardE) :
+        (funct3E == 3'b100) ? ($signed(srca_forwardE) <  $signed(srcb_forwardE)) :
+        (funct3E == 3'b101) ? ($signed(srca_forwardE) >= $signed(srcb_forwardE)) :
+        (funct3E == 3'b110) ? (srca_forwardE <  srcb_forwardE) :
+        (funct3E == 3'b111) ? (srca_forwardE >= srcb_forwardE) : 1'b0;
 
     wire[31:0] branch_targetE = pcE + immE;
     wire[31:0] jalr_targetE = (srca_forwardE + immE) & 32'hffff_fffe;
     wire actual_takenE = validE & (jumpE | (branchE & branch_takenE));
     wire[31:0] actual_targetE = jalrE ? jalr_targetE : branch_targetE;
-    wire pred_wrongE = validE & (branchE | jumpE) &
-        ((pred_takenE != actual_takenE) ||
-         (actual_takenE && (pred_targetE != actual_targetE)));
-    assign redirectE = pred_wrongE;
+    // Branches keep the fast predictor check. Jumps are redirected
+    // unconditionally from EX so the critical request path does not compare a
+    // forwarded JALR target against the predicted target in the same cycle.
+    wire branch_mispredictE = validE & branchE &
+        ((pred_takenE != branch_takenE) ||
+         (branch_takenE && (pred_targetE != branch_targetE)));
+    wire jump_redirect_reqE = validE & jumpE;
+    // A non-branch instruction must never be redirected by the BTB. If the
+    // predictor falsely asserted pred_taken for a non-branch (BTB aliasing),
+    // treat it as a mispredict and redirect to pc+4 so the correct sequential
+    // path is restored instead of silently diverging to a stale BTB target.
+    wire nonbranch_pred_takenE = validE & ~(branchE | jumpE) & pred_takenE;
+    wire pred_wrongE = branch_mispredictE | jump_redirect_reqE | nonbranch_pred_takenE;
+    wire branch_redirect_reqE = pred_wrongE & ~trap_flush & ~redirect_pendingR;
+    assign redirectE = redirect_pendingR;
+    assign bp_invalidateE = nonbranch_pred_takenE & ~memstallM & ~trap_flush & ~redirectE;
     assign redirect_targetE = actual_takenE ? actual_targetE : pcplus4E;
+
+    always @(posedge clk) begin
+        if (rst) begin
+            redirect_pendingR <= 1'b0;
+            redirect_targetR <= 32'b0;
+        end else if (trap_flush & ~memstallM) begin
+            redirect_pendingR <= 1'b0;
+            redirect_targetR <= 32'b0;
+        end else if (~memstallM) begin
+            redirect_targetR <= redirect_targetE;
+            if (redirect_pendingR) begin
+                redirect_pendingR <= 1'b0;
+            end else if (branch_redirect_reqE) begin
+                redirect_pendingR <= 1'b1;
+            end
+        end
+    end
+
+    // ---- mret commit ----
+    assign mret_take = mretE & trap_can_take;
+
+    // ---- CSR read (combinational, EX stage) ----
+    wire meip = (|irq) & meie;
+    reg [31:0] csr_rdataE;
+    always @(*) begin
+        case (csr_addrE)
+            12'h300: csr_rdataE = mstatus;
+            12'h304: csr_rdataE = mie;
+            12'h305: csr_rdataE = mtvec;
+            12'h341: csr_rdataE = mepc;
+            12'h342: csr_rdataE = mcause;
+            12'h344: csr_rdataE = {20'b0, meip, 11'b0}; // mip: MEIP[11]
+            default: csr_rdataE = 32'b0;
+        endcase
+    end
+
+    // ---- CSR write data / new value (combinational, EX stage) ----
+    wire [31:0] csr_wdataE = csr_immE ? {27'b0, zimmE} : srca_forwardE;
+    wire [1:0]  csr_op_kind = csr_opE[1:0]; // 01=w, 10=s, 11=c
+    wire [31:0] csr_newE = (csr_op_kind == 2'b01) ? csr_wdataE :
+                          (csr_op_kind == 2'b10) ? (csr_rdataE | csr_wdataE) :
+                          (csr_op_kind == 2'b11) ? (csr_rdataE & ~csr_wdataE) :
+                          csr_rdataE;
+    wire csr_we_eff = csr_weE & validE & ~memstallM;
+
+    // ---- CSR register file writes (trap/mret have priority over CSR instr) ----
+    always @(posedge clk) begin
+        if (rst) begin
+            mstatus <= 32'h00000000;
+            mie     <= 32'h00000000;
+            mtvec   <= 32'b0;
+            mepc    <= 32'b0;
+            mcause  <= 32'b0;
+        end else if (trap_take) begin
+            mepc       <= pcE;
+            mcause     <= 32'h8000000b;      // machine external interrupt
+            mstatus[7] <= mstatus[3];        // MPIE <= MIE
+            mstatus[3] <= 1'b0;             // MIE  <= 0
+        end else if (mret_take) begin
+            mstatus[3] <= mstatus[7];        // MIE  <= MPIE
+            mstatus[7] <= 1'b1;             // MPIE <= 1
+        end else if (csr_we_eff) begin
+            case (csr_addrE)
+                12'h300: mstatus <= csr_newE & 32'h00000088; // MIE/MPIE only
+                12'h304: mie     <= csr_newE & 32'h00000800; // MEIE only
+                12'h305: mtvec   <= csr_newE;
+                12'h341: mepc    <= csr_newE;
+                12'h342: mcause  <= csr_newE;
+                // mip (0x344) is read-only
+                default: ;
+            endcase
+        end
+    end
 
     always @(posedge clk) begin
         if (rst) begin
@@ -374,9 +579,14 @@ module riscv(
     wire[31:0] storeDataM;
     wire[2:0] load_funct3M;
     wire[2:0] store_funct3M;
-    wire exmem_bubbleE = divstallE;
+    wire[31:0] csr_rdataM;
+    wire[31:0] csr_rdataW;
+    wire exmem_bubbleE = divstallE | trap_take | redirectE;
+    wire[31:0] forwardResultE = (wbselE == WB_PC4) ? pcplus4E :
+                                (wbselE == WB_CSR) ? csr_rdataE : executeResultE;
 
     flopenr #(32) exmem_alu(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : executeResultE, aluResultM);
+    flopenr #(32) exmem_forward(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : forwardResultE, resultM);
     flopenr #(32) exmem_store(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : srcb_forwardE, storeDataM);
     flopenr #(32) exmem_pc4(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : pcplus4E, pcplus4M);
     flopenr #(5)  exmem_rd(clk, rst, ~memstallM, exmem_bubbleE ? 5'b0 : rdE, rdM);
@@ -386,37 +596,64 @@ module riscv(
     flopenr #(1)  exmem_memread(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (memreadE & validE), memreadM);
     flopenr #(1)  exmem_memwrite(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (memwriteE & validE), memwriteM);
     flopenr #(2)  exmem_wbsel(clk, rst, ~memstallM, exmem_bubbleE ? WB_ALU : wbselE, wbselM);
+    flopenr #(32) exmem_csr(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : csr_rdataE, csr_rdataM);
 
     assign d_validM = memreadM | memwriteM;
     assign memstallM = d_validM & ~d_readyM;
     assign aluoutM = aluResultM;
 
     store_align store_align(storeDataM, aluResultM[1:0], store_funct3M, writedataM, wstrbM);
+    wire[31:0] loadDataM;
+    load_ext load_extM(readdataM, aluResultM[1:0], load_funct3M, loadDataM);
 
     // MEM/WB
     wire validW;
     flopenr #(32) memwb_alu(clk, rst, ~memstallM, aluResultM, aluoutW);
-    flopenr #(32) memwb_read(clk, rst, ~memstallM, readdataM, readdataW);
+    flopenr #(32) memwb_load(clk, rst, ~memstallM, loadDataM, loadDataW);
     flopenr #(32) memwb_pc4(clk, rst, ~memstallM, pcplus4M, pcplus4W);
     flopenr #(5)  memwb_rd(clk, rst, ~memstallM, rdM, rdW);
     flopenr #(2)  memwb_wbsel(clk, rst, ~memstallM, wbselM, wbselW);
-    flopenr #(3)  memwb_loadfunct(clk, rst, ~memstallM, load_funct3M, load_funct3W);
-    flopenr #(2)  memwb_loadaddr(clk, rst, ~memstallM, aluResultM[1:0], load_addrW);
     flopenr #(1)  memwb_regwrite(clk, rst, ~memstallM, regwriteM, regwriteW);
     flopenr #(1)  memwb_valid(clk, rst, ~memstallM, (regwriteM | memreadM | memwriteM), validW);
+    flopenr #(32) memwb_csr(clk, rst, ~memstallM, csr_rdataM, csr_rdataW);
 
-    wire[31:0] loadDataW;
-    load_ext load_ext(readdataW, load_addrW, load_funct3W, loadDataW);
     assign resultW = (wbselW == WB_MEM) ? loadDataW :
-                     (wbselW == WB_PC4) ? pcplus4W : aluoutW;
+                     (wbselW == WB_PC4) ? pcplus4W :
+                     (wbselW == WB_CSR) ? csr_rdataW : aluoutW;
 
     wire lwstallD = memreadE &&
         (((rs1D == rdE) && uses_rs1D && (rs1D != 5'b0)) ||
          ((rs2D == rdE) && uses_rs2D && (rs2D != 5'b0)));
     assign stallD = lwstallD | divstallE;
-    assign stallF = lwstallD | divstallE;
-    assign flushD = redirectE & ~memstallM;
-    assign flushE = (lwstallD | redirectE) & ~memstallM;
+    assign stallF = lwstallD | divstallE | ifetch_stall;
+    assign flushD = (redirectE | trap_flush | fetch_redirectF) & ~memstallM;
+    assign flushE = (lwstallD | redirectE | trap_flush) & ~memstallM;
+
+    reg bp_updateR;
+    reg bp_invalidateR;
+    reg bp_takenR;
+    reg[31:0] bp_pcR;
+    reg[31:0] bp_targetR;
+
+    always @(posedge clk) begin
+        if (rst) begin
+            bp_updateR <= 1'b0;
+            bp_invalidateR <= 1'b0;
+            bp_takenR <= 1'b0;
+            bp_pcR <= 32'b0;
+            bp_targetR <= 32'b0;
+        end else begin
+            bp_updateR <= 1'b0;
+            bp_invalidateR <= 1'b0;
+            if (~memstallM) begin
+                bp_updateR <= validE & branchE & ~redirectE & ~trap_flush;
+                bp_invalidateR <= bp_invalidateE;
+                bp_takenR <= branch_takenE;
+                bp_pcR <= pcE;
+                bp_targetR <= branch_targetE;
+            end
+        end
+    end
 
     branch_predictor bp(
         .clk(clk),
@@ -424,14 +661,21 @@ module riscv(
         .pcF(pcF),
         .pred_takenF(pred_takenF),
         .pred_targetF(pred_targetF),
-        .updateE(validE & branchE & ~memstallM),
-        .pcE(pcE),
-        .takenE(branch_takenE),
-        .targetE(branch_targetE)
+        .updateE(bp_updateR),
+        .invalidateE(bp_invalidateR),
+        .pcE(bp_pcR),
+        .takenE(bp_takenR),
+        .targetE(bp_targetR)
         );
 
     assign perf_retireW = validW & ~memstallM;
     assign perf_branchE = validE & branchE & ~memstallM;
-    assign perf_mispredictE = pred_wrongE & ~memstallM;
+    assign perf_mispredictE = branch_redirect_reqE & ~memstallM;
     assign perf_stall = stallD | memstallM;
+    assign perf_stall_loaduse = lwstallD;
+    assign perf_stall_muldiv = divstallE;
+    assign perf_stall_dcache = memstallM;
+    assign perf_stall_ifetch = ifetch_stall;
+    assign perf_flush_branch = redirectE & ~memstallM;
+    assign perf_flush_trap = trap_flush & ~memstallM;
 endmodule
