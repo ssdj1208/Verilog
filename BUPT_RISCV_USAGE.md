@@ -1,6 +1,6 @@
 # BUPT RISC-V CPU 项目使用说明
 
-本文档说明如何使用本仓库中的北邮题目 B 改造项目：`bupt_riscv`。该项目基于原 `step_into_mips` 的 SoC 外壳，新增 RV32I 课程子集五级流水 CPU、分支预测、性能计数器、RISC-V boot 程序和 Vivado 2025.2 脚本。
+本文档说明如何使用本仓库中的北邮题目 B 改造项目：`bupt_riscv`。该项目基于原 `step_into_mips` 的 SoC 外壳，新增 RV32I 课程子集五级流水 CPU、分支预测、性能计数器、RISC-V boot 程序和 Vivado 脚本。
 
 ## 1. 项目内容
 
@@ -9,6 +9,7 @@
 ```text
 src/bupt_riscv/                  RISC-V SoC 顶层、总线、外设、DDR 桥接
 src/bupt_riscv/riscv_core/       RV32I 五级流水 CPU 核
+src/common/                      通用 UART 收发模块
 software/bupt_riscv/             RISC-V boot ROM 生成器和 listing
 sim/bupt_riscv_tb.v              行为级仿真 testbench
 scripts/sim_bupt_riscv.tcl       Vivado 仿真脚本
@@ -34,7 +35,7 @@ constr/nexys4ddr_bupt_riscv.xdc  NEXYS4 约束文件
 本项目已按以下环境验证：
 
 ```text
-Vivado 2025.2
+Vivado 2023.2
 Windows PowerShell
 NEXYS4 DDR / Artix-7 xc7a100tcsg324-1
 ```
@@ -42,13 +43,13 @@ NEXYS4 DDR / Artix-7 xc7a100tcsg324-1
 你的 Vivado 路径为：
 
 ```text
-D:\programe_files\vivado\2025.2\Vivado\settings64.bat
+D:\Xilinx\Vivado\2023.2\settings64.bat
 ```
 
 如果以后换机器，先检查路径是否存在：
 
 ```powershell
-Test-Path "D:\programe_files\vivado\2025.2\Vivado\settings64.bat"
+Test-Path "D:\Xilinx\Vivado\2023.2\settings64.bat"
 ```
 
 ## 3. 每次运行前的准备
@@ -56,7 +57,7 @@ Test-Path "D:\programe_files\vivado\2025.2\Vivado\settings64.bat"
 进入项目目录：
 
 ```powershell
-cd D:\project\step_into_mips
+cd D:\CodeProject\Verilog_Project\COCP\Verilog
 ```
 
 生成 RISC-V boot ROM：
@@ -82,7 +83,7 @@ software/bupt_riscv/gen_bupt_boot.lst
 运行：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
 ```
 
 成功标志：
@@ -106,13 +107,13 @@ BUPT_RISCV_SIM_DONE
 运行：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\build_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\build_bupt_riscv.tcl"
 ```
 
 成功标志：
 
 ```text
-BUPT_RISCV_BITSTREAM=D:/project/step_into_mips/build/bupt_riscv_top.bit
+BUPT_RISCV_BITSTREAM=<repo>/build/bupt_riscv_top.bit
 ```
 
 生成的 bitstream 文件：
@@ -133,13 +134,13 @@ build/bupt_riscv_top.bit
 连接 NEXYS4，打开电源，确认 JTAG 可用后运行：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\program_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\program_bupt_riscv.tcl"
 ```
 
 成功标志：
 
 ```text
-BUPT_RISCV_PROGRAMMED=xc7a100t_0 BITSTREAM=D:/project/step_into_mips/build/bupt_riscv_top.bit
+BUPT_RISCV_PROGRAMMED=xc7a100t_0 BITSTREAM=<repo>/build/bupt_riscv_top.bit
 ```
 
 ## 7. 串口验收
@@ -249,7 +250,7 @@ performance counter：
 确认路径：
 
 ```powershell
-Test-Path "D:\programe_files\vivado\2025.2\Vivado\settings64.bat"
+Test-Path "D:\Xilinx\Vivado\2023.2\settings64.bat"
 ```
 
 如果返回 `False`，需要改成你实际的 Vivado 安装路径。

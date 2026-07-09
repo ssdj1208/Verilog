@@ -5,10 +5,12 @@ module simple_bus #(
     parameter TIMER_TICK_CYCLES = 32'd50000000
 )(
     input wire clk,
+    input wire perf_clk,
     input wire rst,
 
     input wire[31:0] i_addr,
     output wire[31:0] i_rdata,
+    output wire i_ready,
 
     input wire d_valid,
     output wire d_ready,
@@ -39,7 +41,17 @@ module simple_bus #(
     input wire perf_retireW,
     input wire perf_branchE,
     input wire perf_mispredictE,
-    input wire perf_stall
+    input wire perf_stall,
+    input wire perf_stall_loaduse,
+    input wire perf_stall_muldiv,
+    input wire perf_stall_dcache,
+    input wire perf_stall_ifetch,
+    input wire perf_flush_branch,
+    input wire perf_flush_trap,
+    input wire[31:0] debug_branch_pc,
+    input wire[31:0] debug_branch_srca,
+    input wire[31:0] debug_branch_srcb,
+    input wire[31:0] debug_branch_info
     );
 
     wire boot_sel_i = (i_addr[31:14] == 18'h00000);
@@ -53,6 +65,7 @@ module simple_bus #(
     wire perf_sel_d = (d_addr[31:8] == 24'h100050);
     wire cache_sel_d = (d_addr[31:8] == 24'h100060);
     wire fp_sel_d = (d_addr[31:8] == 24'h100070);
+    wire debug_sel_d = (d_addr[31:8] == 24'h100080);
     wire ddr_sel_d = (d_addr[31:27] == 5'b10000);
 
     wire ddr_ready;
@@ -70,11 +83,22 @@ module simple_bus #(
     wire[31:0] cache_hits;
     wire[31:0] cache_misses;
     wire[31:0] cache_replacements;
-    wire cache_clear_stats = d_we & cache_sel_d & |d_wstrb & (d_addr[4:0] == 5'h1c) & d_wdata[0];
-
-    wire d_re = ~d_we;
+    wire[31:0] cache_refill_cycles;
+    wire[31:0] icache_accesses;
+    wire[31:0] icache_hits;
+    wire[31:0] icache_misses;
+    wire[31:0] icache_refill_cycles;
+    reg d_local_ready;
+    wire d_local_access = d_valid & ~ddr_sel_d;
+    wire d_local_fire = d_local_access & ~d_local_ready;
+    wire d_we_local = d_local_fire & d_we;
+    wire d_re = d_local_fire & ~d_we;
+    wire cache_clear_stats = d_we_local & cache_sel_d & |d_wstrb & (d_addr[5:0] == 6'h1c) & d_wdata[0];
 
     wire[31:0] boot_i_rdata;
+    wire[31:0] icache_be_addr;
+    wire[31:0] icache_rdata;
+    wire icache_ready;
     wire[31:0] boot_d_rdata;
     wire[31:0] ram_rdata;
     wire[31:0] gpio_rdata;
@@ -83,13 +107,29 @@ module simple_bus #(
     wire[31:0] irq_rdata;
     wire[31:0] perf_rdata;
     reg[31:0] cache_mmio_rdata;
+    reg[31:0] debug_rdata;
     wire[31:0] fp_rdata;
     wire timer_irq;
 
     boot_rom iboot(
         .clk(clk),
-        .a(i_addr[13:2]),
+        .a(icache_be_addr[13:2]),
         .spo(boot_i_rdata)
+        );
+
+    icache icache_i(
+        .clk(clk),
+        .rst(rst),
+        .invalidate(cache_clear_stats),
+        .cpu_addr(i_addr),
+        .cpu_rdata(icache_rdata),
+        .cpu_ready(icache_ready),
+        .be_addr(icache_be_addr),
+        .be_rdata(boot_i_rdata),
+        .access_count(icache_accesses),
+        .hit_count(icache_hits),
+        .miss_count(icache_misses),
+        .refill_cycle_count(icache_refill_cycles)
         );
 
     boot_rom dboot(
@@ -98,9 +138,17 @@ module simple_bus #(
         .spo(boot_d_rdata)
         );
 
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            d_local_ready <= 1'b0;
+        end else begin
+            d_local_ready <= d_local_access & ~d_local_ready;
+        end
+    end
+
     bram_ram #(.ADDR_WIDTH(10)) ram(
         .clk(clk),
-        .we(d_we & ram_sel_d),
+        .we(d_we_local & ram_sel_d),
         .wstrb(d_wstrb),
         .word_addr(d_addr[11:2]),
         .wdata(d_wdata),
@@ -110,7 +158,7 @@ module simple_bus #(
     gpio_mmio gpio(
         .clk(clk),
         .rst(rst),
-        .we(d_we & gpio_sel_d & |d_wstrb),
+        .we(d_we_local & gpio_sel_d & |d_wstrb),
         .wdata(d_wdata),
         .rdata(gpio_rdata),
         .led(led)
@@ -119,7 +167,7 @@ module simple_bus #(
     uart_mmio #(.CLKS_PER_BIT(UART_CLKS_PER_BIT)) uart(
         .clk(clk),
         .rst(rst),
-        .we(d_we & uart_sel_d & |d_wstrb),
+        .we(d_we_local & uart_sel_d & |d_wstrb),
         .re(d_re & uart_sel_d),
         .wstrb(d_wstrb),
         .addr(d_addr[3:0]),
@@ -134,7 +182,7 @@ module simple_bus #(
     timer_mmio #(.DEFAULT_COMPARE(TIMER_TICK_CYCLES)) timer(
         .clk(clk),
         .rst(rst),
-        .we(d_we & timer_sel_d & |d_wstrb),
+        .we(d_we_local & timer_sel_d & |d_wstrb),
         .re(d_re & timer_sel_d),
         .wstrb(d_wstrb),
         .addr(d_addr[3:0]),
@@ -146,7 +194,7 @@ module simple_bus #(
     irq_controller irqc(
         .clk(clk),
         .rst(rst),
-        .we(d_we & irq_sel_d & |d_wstrb),
+        .we(d_we_local & irq_sel_d & |d_wstrb),
         .re(d_re & irq_sel_d),
         .wstrb(d_wstrb),
         .addr(d_addr[3:0]),
@@ -157,23 +205,30 @@ module simple_bus #(
         );
 
     perf_mmio perf(
-        .clk(clk),
+        .clk(perf_clk),
         .rst(rst),
-        .we(d_we & perf_sel_d & |d_wstrb),
+        .we(d_we_local & perf_sel_d & |d_wstrb),
         .re(d_re & perf_sel_d),
-        .addr(d_addr[4:0]),
+        .addr(d_addr[5:0]),
         .wdata(d_wdata),
         .rdata(perf_rdata),
         .retire(perf_retireW),
         .branch(perf_branchE),
         .mispredict(perf_mispredictE),
-        .stall(perf_stall)
+        .stall(perf_stall),
+        .stall_loaduse(perf_stall_loaduse),
+        .stall_muldiv(perf_stall_muldiv),
+        .stall_dcache(perf_stall_dcache),
+        .stall_ifetch(perf_stall_ifetch),
+        .stall_ddr_wait(d_valid & ddr_sel_d & ~cache_ready),
+        .flush_branch(perf_flush_branch),
+        .flush_trap(perf_flush_trap)
         );
 
     fp_mmio fp(
         .clk(clk),
         .rst(rst),
-        .we(d_we & fp_sel_d & |d_wstrb),
+        .we(d_we_local & fp_sel_d & |d_wstrb),
         .re(d_re & fp_sel_d),
         .addr(d_addr[4:0]),
         .wdata(d_wdata),
@@ -181,14 +236,29 @@ module simple_bus #(
         );
 
     always @(*) begin
-        case (d_addr[4:0])
-            5'h00: cache_mmio_rdata = cache_accesses;
-            5'h04: cache_mmio_rdata = cache_hits;
-            5'h08: cache_mmio_rdata = cache_misses;
-            5'h0c: cache_mmio_rdata = cache_replacements;
-            5'h10: cache_mmio_rdata = 32'h0002_0010; // 2-way, 16 sets
-            5'h14: cache_mmio_rdata = 32'd1; // policy 1 = LRU
+        case (d_addr[5:0])
+            6'h00: cache_mmio_rdata = cache_accesses;
+            6'h04: cache_mmio_rdata = cache_hits;
+            6'h08: cache_mmio_rdata = cache_misses;
+            6'h0c: cache_mmio_rdata = cache_replacements;
+            6'h10: cache_mmio_rdata = 32'h0002_0410; // D$: 2-way, 4-word lines, 16 sets
+            6'h14: cache_mmio_rdata = 32'd1; // policy 1 = LRU, write-through
+            6'h18: cache_mmio_rdata = cache_refill_cycles;
+            6'h20: cache_mmio_rdata = icache_accesses;
+            6'h24: cache_mmio_rdata = icache_hits;
+            6'h28: cache_mmio_rdata = icache_misses;
+            6'h2c: cache_mmio_rdata = icache_refill_cycles;
             default: cache_mmio_rdata = 32'b0;
+        endcase
+    end
+
+    always @(*) begin
+        case (d_addr[4:0])
+            5'h00: debug_rdata = debug_branch_pc;
+            5'h04: debug_rdata = debug_branch_srca;
+            5'h08: debug_rdata = debug_branch_srcb;
+            5'h0c: debug_rdata = debug_branch_info;
+            default: debug_rdata = 32'b0;
         endcase
     end
 
@@ -213,7 +283,8 @@ module simple_bus #(
         .access_count(cache_accesses),
         .hit_count(cache_hits),
         .miss_count(cache_misses),
-        .replacement_count(cache_replacements)
+        .replacement_count(cache_replacements),
+        .refill_cycle_count(cache_refill_cycles)
         );
 
     ddr_bridge ddr(
@@ -241,12 +312,13 @@ module simple_bus #(
         );
 
 
-    assign i_rdata = boot_sel_i ? boot_i_rdata : 32'b0;
+    assign i_rdata = boot_sel_i ? icache_rdata : 32'b0;
+    assign i_ready = boot_sel_i ? icache_ready : 1'b1;
 
     // Local regions remain single-cycle ready. The DDR region can stretch the
     // CPU M stage through d_ready=0 until ddr_bridge completes the transaction.
     assign d_ready = ~d_valid ? 1'b1 :
-                     ddr_sel_d ? cache_ready : 1'b1;
+                     ddr_sel_d ? cache_ready : d_local_ready;
 
     assign d_rdata = boot_sel_d       ? boot_d_rdata :
                      ram_sel_d        ? ram_rdata :
@@ -257,6 +329,7 @@ module simple_bus #(
                      perf_sel_d       ? perf_rdata :
                      cache_sel_d      ? cache_mmio_rdata :
                      fp_sel_d         ? fp_rdata :
+                     debug_sel_d      ? debug_rdata :
                      ddr_status_sel_d ? {30'b0, ddr_busy, ddr_calib_done} :
                      ddr_sel_d        ? cache_rdata : 32'b0;
 endmodule

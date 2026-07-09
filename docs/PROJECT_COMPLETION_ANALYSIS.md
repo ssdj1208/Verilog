@@ -7,13 +7,13 @@
 当前状态：
 
 ```text
-行为级仿真：已通过
-综合/实现/bitstream：已通过
+行为级仿真：脚本已准备
+综合/实现/bitstream：Vivado 2023.2 已通过，已生成 build/bupt_riscv_top.bit
 时序目标：满足 100 MHz
 实物上板证据：需要学生在 NEXYS4 DDR 上补充截图、照片或视频
 ```
 
-也就是说，RTL 和工程脚本已经基本完成。后续课程交付重点是收集上板验证证据，并在报告中补充波形、串口输出、PPA 分析和性能计数数据。
+也就是说，RTL、工程脚本和 bitstream 构建已经基本完成。后续课程交付重点是收集上板验证证据，并在报告中补充波形、串口输出、PPA 分析和性能计数数据。
 
 ## 2. 课程要求覆盖矩阵
 
@@ -28,8 +28,8 @@
 | 控制冒险处理 | 已完成 | 实现分支预测、EX 阶段解析和错误路径 flush。 |
 | 内存和 I/O 集成 | 已完成 | 集成 Boot ROM、BRAM、UART、GPIO、Timer、DDR Bridge、性能计数 MMIO。 |
 | 性能计数器 | 已完成 | 支持 cycle、retired instruction、branch、mispredict、stall 计数。 |
-| Vivado 2025.2 仿真脚本 | 已完成 | `scripts/sim_bupt_riscv.tcl`。 |
-| Vivado 2025.2 构建脚本 | 已完成 | `scripts/build_bupt_riscv.tcl`。 |
+| Vivado 仿真脚本 | 已完成 | `scripts/sim_bupt_riscv.tcl`。 |
+| Vivado 构建脚本 | 已完成 | `scripts/build_bupt_riscv.tcl`，已生成工程和 bitstream。 |
 | NEXYS4 DDR 下载脚本 | 已完成 | `scripts/program_bupt_riscv.tcl`。 |
 | 实物硬件验证 | 待补证据 | 需要下载板卡后保存串口截图、LED 照片或视频。 |
 
@@ -172,18 +172,18 @@ FP TEST OK
 PERF READY
 ```
 
-最近一次 Vivado 实现结果：
+当前 Vivado 2023.2 实现结果：
 
 | 指标 | 结果 |
 | --- | ---: |
 | WNS | 1.316 ns |
 | TNS | 0.000 ns |
 | 主 100 MHz 时钟 WNS | 6.688 ns |
-| LUT | 14279 / 63400，22.52% |
-| Register | 12305 / 126800，9.70% |
+| LUT | 14153 / 63400，22.32% |
+| Register | 12313 / 126800，9.71% |
 | BRAM Tile | 5 / 135，3.70% |
 | DSP | 14 / 240，5.83% |
-| 估计功耗 | 1.826 W |
+| 估计功耗 | 1.707 W |
 
 结论：当前实现满足 100 MHz 时序，资源占用仍有较大余量。
 

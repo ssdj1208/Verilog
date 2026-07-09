@@ -5,13 +5,20 @@ module perf_mmio(
     input wire rst,
     input wire we,
     input wire re,
-    input wire[4:0] addr,
+    input wire[5:0] addr,
     input wire[31:0] wdata,
     output reg[31:0] rdata,
     input wire retire,
     input wire branch,
     input wire mispredict,
-    input wire stall
+    input wire stall,
+    input wire stall_loaduse,
+    input wire stall_muldiv,
+    input wire stall_dcache,
+    input wire stall_ifetch,
+    input wire stall_ddr_wait,
+    input wire flush_branch,
+    input wire flush_trap
     );
 
     reg[31:0] cycles;
@@ -19,30 +26,60 @@ module perf_mmio(
     reg[31:0] branches;
     reg[31:0] mispredicts;
     reg[31:0] stalls;
+    reg[31:0] stalls_loaduse;
+    reg[31:0] stalls_muldiv;
+    reg[31:0] stalls_dcache;
+    reg[31:0] stalls_ifetch;
+    reg[31:0] stalls_ddr_wait;
+    reg[31:0] flushes_branch;
+    reg[31:0] flushes_trap;
+
+    wire clear = rst || (we && addr == 6'h1c && wdata[0]);
 
     always @(posedge clk) begin
-        if (rst || (we && addr == 5'h1c && wdata[0])) begin
+        if (clear) begin
             cycles <= 32'b0;
             retired <= 32'b0;
             branches <= 32'b0;
             mispredicts <= 32'b0;
             stalls <= 32'b0;
+            stalls_loaduse <= 32'b0;
+            stalls_muldiv <= 32'b0;
+            stalls_dcache <= 32'b0;
+            stalls_ifetch <= 32'b0;
+            stalls_ddr_wait <= 32'b0;
+            flushes_branch <= 32'b0;
+            flushes_trap <= 32'b0;
         end else begin
             cycles <= cycles + 32'd1;
             if (retire) retired <= retired + 32'd1;
             if (branch) branches <= branches + 32'd1;
             if (mispredict) mispredicts <= mispredicts + 32'd1;
             if (stall) stalls <= stalls + 32'd1;
+            if (stall_loaduse) stalls_loaduse <= stalls_loaduse + 32'd1;
+            if (stall_muldiv) stalls_muldiv <= stalls_muldiv + 32'd1;
+            if (stall_dcache) stalls_dcache <= stalls_dcache + 32'd1;
+            if (stall_ifetch) stalls_ifetch <= stalls_ifetch + 32'd1;
+            if (stall_ddr_wait) stalls_ddr_wait <= stalls_ddr_wait + 32'd1;
+            if (flush_branch) flushes_branch <= flushes_branch + 32'd1;
+            if (flush_trap) flushes_trap <= flushes_trap + 32'd1;
         end
     end
 
     always @(*) begin
         case (addr)
-            5'h00: rdata = cycles;
-            5'h04: rdata = retired;
-            5'h08: rdata = branches;
-            5'h0c: rdata = mispredicts;
-            5'h10: rdata = stalls;
+            6'h00: rdata = cycles;
+            6'h04: rdata = retired;
+            6'h08: rdata = branches;
+            6'h0c: rdata = mispredicts;
+            6'h10: rdata = stalls;
+            6'h14: rdata = stalls_loaduse;
+            6'h18: rdata = stalls_muldiv;
+            6'h1c: rdata = stalls_dcache;
+            6'h20: rdata = stalls_ifetch;
+            6'h24: rdata = stalls_ddr_wait;
+            6'h28: rdata = flushes_branch;
+            6'h2c: rdata = flushes_trap;
             default: rdata = 32'b0;
         endcase
     end

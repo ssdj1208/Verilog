@@ -1,6 +1,6 @@
 # 北邮项目式课程阶段二题目 B：RISC-V CPU 项目
 
-本仓库是面向北京邮电大学《项目式课程阶段二》题目 B 的独立交付版本，目标是在 NEXYS4 DDR 板卡上实现一个基于 **RV32I 课程子集** 的五级流水 CPU SoC。工程使用 Vivado 2025.2 验证，目录中只保留北邮 RISC-V 项目相关内容，不包含原始 MIPS lab、原始文档、XPR 工程或无关实验文件。
+本仓库是面向北京邮电大学《项目式课程阶段二》题目 B 的独立交付版本，目标是在 NEXYS4 DDR 板卡上实现一个基于 **RV32I 课程子集** 的五级流水 CPU SoC。当前工程已使用 Vivado 2023.2 完成综合、实现和 bitstream 生成，目录中只保留北邮 RISC-V 项目相关内容，不包含原始 MIPS lab、原始文档、XPR 工程或无关实验文件。
 
 ## 一、文档入口
 
@@ -15,6 +15,7 @@
 ```text
 src/bupt_riscv/                  RISC-V SoC、总线、内存、外设、DDR 桥接
 src/bupt_riscv/riscv_core/       RV32I 五级流水 CPU 核
+src/common/                      通用 UART 收发模块
 software/bupt_riscv/             Boot ROM 生成脚本和指令 listing
 sim/bupt_riscv_tb.v              Vivado 行为级仿真 testbench
 scripts/sim_bupt_riscv.tcl       Vivado 仿真脚本
@@ -36,10 +37,10 @@ docs/                            使用说明、完成度分析、构建摘要
 
 ## 四、快速开始
 
-本项目验证时使用的 Vivado 路径为：
+本项目当前验证使用的 Vivado 路径为：
 
 ```powershell
-D:\programe_files\vivado\2025.2\Vivado\settings64.bat
+D:\Xilinx\Vivado\2023.2\settings64.bat
 ```
 
 如果你的 Vivado 安装路径不同，请把下面命令中的路径替换成自己的实际路径。
@@ -53,19 +54,19 @@ python software\bupt_riscv\gen_bupt_boot.py
 运行行为级仿真：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\sim_bupt_riscv.tcl"
 ```
 
 生成 bitstream：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\build_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\build_bupt_riscv.tcl"
 ```
 
 下载到 NEXYS4 DDR：
 
 ```powershell
-cmd /c ""D:\programe_files\vivado\2025.2\Vivado\settings64.bat" && vivado -mode batch -source scripts\program_bupt_riscv.tcl"
+cmd /c "call ""D:\Xilinx\Vivado\2023.2\settings64.bat"" && vivado -mode batch -source scripts\program_bupt_riscv.tcl"
 ```
 
 串口设置：
@@ -90,5 +91,5 @@ PERF READY
 
 ## 五、当前完成状态
 
-当前 RTL、boot 程序、仿真脚本和综合脚本已经形成闭环。仿真已通过，Vivado 实现已生成 bitstream 并满足 100 MHz 时序。课程报告中还需要补充实物上板证据，例如串口输出截图、LED 点亮照片或视频、`perf` 命令输出和 CPI 计算。
+当前 RTL、boot 程序、仿真脚本和综合脚本已经形成可独立构建的目录结构。已运行 `scripts/build_bupt_riscv.tcl` 并生成 `build/bupt_riscv_top.bit`，实现后时序满足约束。课程报告中还需要补充实物上板证据，例如串口输出截图、LED 点亮照片或视频、`perf` 命令输出和 CPI 计算。
 

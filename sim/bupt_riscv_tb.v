@@ -29,7 +29,7 @@ module bupt_riscv_tb();
     localparam integer BIT_NS = CLKS_PER_BIT * 10;
     localparam integer TIMER_TICK_CYCLES = 50000;
 
-    assign bus_clk = ~clk;
+    assign bus_clk = clk;
 
     integer cycle_count;
     reg[7:0] rx_byte;
@@ -67,7 +67,7 @@ module bupt_riscv_tb();
         .READ_LATENCY(7),
         .WRITE_LATENCY(5)
     ) ddr_backend(
-        .clk(~clk),
+        .clk(clk),
         .rst(rst),
         .req_valid(ddr_backend_valid),
         .req_we(ddr_backend_we),
@@ -148,11 +148,18 @@ module bupt_riscv_tb();
 
     task expect_byte;
         input [7:0] expected;
+        integer extra_i;
         begin
             uart_recv_byte(rx_byte);
             if (rx_byte !== expected) begin
                 $display("Simulation Failed: expected byte %h (%c), got %h (%c)",
                          expected, expected, rx_byte, rx_byte);
+                $write("UART tail: %c", rx_byte);
+                for (extra_i = 0; extra_i < 80; extra_i = extra_i + 1) begin
+                    uart_recv_byte(rx_byte);
+                    $write("%c", rx_byte);
+                end
+                $display("");
                 $display("DEBUG pc=%h instr=%h instrD=%h pcD=%h pcE=%h validD=%b validE=%b",
                          dut.pc, dut.instr, dut.cpu.instrD, dut.cpu.pcD,
                          dut.cpu.pcE, dut.cpu.validD, dut.cpu.validE);
@@ -230,16 +237,55 @@ module bupt_riscv_tb();
 
     task expect_hex_line;
         integer i;
+        integer extra_i;
         begin
             for (i = 0; i < 8; i = i + 1) begin
                 uart_recv_byte(rx_byte);
                 if (!((rx_byte >= "0" && rx_byte <= "9") ||
                       (rx_byte >= "A" && rx_byte <= "F"))) begin
                     $display("Simulation Failed: expected hex digit, got %h", rx_byte);
+                    $write("UART tail: %c", rx_byte);
+                    for (extra_i = 0; extra_i < 80; extra_i = extra_i + 1) begin
+                        uart_recv_byte(rx_byte);
+                        $write("%c", rx_byte);
+                    end
+                    $display("");
                     $finish;
                 end
             end
             expect_crlf();
+        end
+    endtask
+
+    task expect_nonzero_hex_line;
+        integer i;
+        integer extra_i;
+        reg[31:0] value;
+        begin
+            value = 32'b0;
+            for (i = 0; i < 8; i = i + 1) begin
+                uart_recv_byte(rx_byte);
+                value = {value[27:0], 4'b0};
+                if (rx_byte >= "0" && rx_byte <= "9") begin
+                    value[3:0] = rx_byte - "0";
+                end else if (rx_byte >= "A" && rx_byte <= "F") begin
+                    value[3:0] = rx_byte - "A" + 4'd10;
+                end else begin
+                    $display("Simulation Failed: expected hex digit, got %h", rx_byte);
+                    $write("UART tail: %c", rx_byte);
+                    for (extra_i = 0; extra_i < 80; extra_i = extra_i + 1) begin
+                        uart_recv_byte(rx_byte);
+                        $write("%c", rx_byte);
+                    end
+                    $display("");
+                    $finish;
+                end
+            end
+            expect_crlf();
+            if (value == 32'b0) begin
+                $display("Simulation Failed: expected nonzero hex value");
+                $finish;
+            end
         end
     endtask
 
@@ -255,7 +301,7 @@ module bupt_riscv_tb();
         expect_string("rv32> ");
 
         send_line("help");
-        expect_line("help mem perf cache fp led run");
+        expect_line("help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat");
         expect_string("rv32> ");
 
         send_line("mem");
@@ -293,6 +339,183 @@ module bupt_riscv_tb();
         expect_hex_line();
         expect_string("stalls=");
         expect_hex_line();
+        expect_string("stall_lu=");
+        expect_hex_line();
+        expect_string("stall_md=");
+        expect_hex_line();
+        expect_string("stall_dc=");
+        expect_hex_line();
+        expect_string("stall_if=");
+        expect_hex_line();
+        expect_string("stall_ddr=");
+        expect_hex_line();
+        expect_string("flush_br=");
+        expect_hex_line();
+        expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("rv32> ");
+
+        send_line("perf clear");
+        expect_line("OK");
+        expect_string("rv32> ");
+
+        send_line("perf");
+        expect_string("cycles=");
+        expect_hex_line();
+        expect_string("retired=");
+        expect_hex_line();
+        expect_string("branches=");
+        expect_hex_line();
+        expect_string("mispredicts=");
+        expect_hex_line();
+        expect_string("stalls=");
+        expect_hex_line();
+        expect_string("stall_lu=");
+        expect_hex_line();
+        expect_string("stall_md=");
+        expect_hex_line();
+        expect_string("stall_dc=");
+        expect_hex_line();
+        expect_string("stall_if=");
+        expect_hex_line();
+        expect_string("stall_ddr=");
+        expect_hex_line();
+        expect_string("flush_br=");
+        expect_hex_line();
+        expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("rv32> ");
+
+        send_line("bench alu");
+        expect_string("BALU cycles=");
+        expect_hex_line();
+        expect_string("retired=");
+        expect_hex_line();
+        expect_string("branches=");
+        expect_hex_line();
+        expect_string("mispredicts=");
+        expect_hex_line();
+        expect_string("stalls=");
+        expect_hex_line();
+        expect_string("stall_lu=");
+        expect_hex_line();
+        expect_string("stall_md=");
+        expect_hex_line();
+        expect_string("stall_dc=");
+        expect_hex_line();
+        expect_string("stall_if=");
+        expect_hex_line();
+        expect_string("stall_ddr=");
+        expect_hex_line();
+        expect_string("flush_br=");
+        expect_hex_line();
+        expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("rv32> ");
+
+        send_line("bench mem");
+        expect_string("BMEM cycles=");
+        expect_hex_line();
+        expect_string("retired=");
+        expect_hex_line();
+        expect_string("branches=");
+        expect_hex_line();
+        expect_string("mispredicts=");
+        expect_hex_line();
+        expect_string("stalls=");
+        expect_hex_line();
+        expect_string("stall_lu=");
+        expect_hex_line();
+        expect_string("stall_md=");
+        expect_hex_line();
+        expect_string("stall_dc=");
+        expect_hex_line();
+        expect_string("stall_if=");
+        expect_hex_line();
+        expect_string("stall_ddr=");
+        expect_hex_line();
+        expect_string("flush_br=");
+        expect_hex_line();
+        expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("misses=");
+        expect_hex_line();
+        expect_string("rv32> ");
+
+        send_line("bench branch");
+        expect_string("BBR branches=");
+        expect_hex_line();
+        expect_string("mispredicts=");
+        expect_hex_line();
+        expect_string("cycles=");
+        expect_hex_line();
+        expect_string("retired=");
+        expect_hex_line();
+        expect_string("stalls=");
+        expect_hex_line();
+        expect_string("stall_lu=");
+        expect_hex_line();
+        expect_string("stall_md=");
+        expect_hex_line();
+        expect_string("stall_dc=");
+        expect_hex_line();
+        expect_string("stall_if=");
+        expect_hex_line();
+        expect_string("stall_ddr=");
+        expect_hex_line();
+        expect_string("flush_br=");
+        expect_hex_line();
+        expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("rv32> ");
+
+        send_line("perf");
+        expect_string("cycles=");
+        expect_hex_line();
+        expect_string("retired=");
+        expect_hex_line();
+        expect_string("branches=");
+        expect_nonzero_hex_line();
+        expect_string("mispredicts=");
+        expect_hex_line();
+        expect_string("stalls=");
+        expect_hex_line();
+        expect_string("stall_lu=");
+        expect_hex_line();
+        expect_string("stall_md=");
+        expect_hex_line();
+        expect_string("stall_dc=");
+        expect_hex_line();
+        expect_string("stall_if=");
+        expect_hex_line();
+        expect_string("stall_ddr=");
+        expect_hex_line();
+        expect_string("flush_br=");
+        expect_hex_line();
+        expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("rv32> ");
+
+        // Interrupt test: enable timer interrupt. The handler toggles LED[1]
+        // and increments a tick counter at BRAM 0x10400 each time it fires.
+        send_line("int on");
+        expect_line("INT ON");
+        expect_string("rv32> ");
+
+        begin : int_drain
+            integer p;
+            for (p = 0; p < 60; p = p + 1) begin
+                send_line("t");
+                expect_string("tick=");
+                expect_hex_line();
+                expect_string("pending=");
+                expect_hex_line();
+                expect_string("rv32> ");
+            end
+        end
+
+        send_line("o");
+        expect_line("INT OFF");
         expect_string("rv32> ");
 
         $display("Simulation succeeded: BUPT RISC-V CPU verified");

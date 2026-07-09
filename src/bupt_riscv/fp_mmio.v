@@ -13,6 +13,10 @@ module fp_mmio(
     reg[31:0] op_a;
     reg[31:0] op_b;
     reg[1:0] op_sel; // 0 add, 1 mul
+    reg[31:0] result_reg;
+    reg[1:0] busy_count;
+    reg busy;
+    reg ready;
     wire[31:0] add_result;
     wire[31:0] mul_result;
     wire[31:0] result = (op_sel == 2'd1) ? mul_result : add_result;
@@ -25,25 +29,52 @@ module fp_mmio(
             op_a <= 32'b0;
             op_b <= 32'b0;
             op_sel <= 2'b0;
+            result_reg <= 32'b0;
+            busy_count <= 2'b0;
+            busy <= 1'b0;
+            ready <= 1'b1;
         end else if (we) begin
             case (addr)
-                5'h00: op_a <= wdata;
-                5'h04: op_b <= wdata;
-                5'h08: op_sel <= wdata[1:0];
+                5'h00: begin
+                    op_a <= wdata;
+                    ready <= 1'b0;
+                end
+                5'h04: begin
+                    op_b <= wdata;
+                    ready <= 1'b0;
+                end
+                5'h08: begin
+                    op_sel <= wdata[1:0];
+                    busy <= 1'b1;
+                    ready <= 1'b0;
+                    busy_count <= 2'd2;
+                end
                 default: begin end
             endcase
+        end else if (busy) begin
+            if (busy_count != 2'b0) begin
+                busy_count <= busy_count - 2'b01;
+            end else begin
+                result_reg <= result;
+                busy <= 1'b0;
+                ready <= 1'b1;
+            end
         end
     end
 
-    always @(*) begin
-        case (addr)
-            5'h00: rdata = op_a;
-            5'h04: rdata = op_b;
-            5'h08: rdata = {30'b0, op_sel};
-            5'h0c: rdata = result;
-            5'h10: rdata = 32'd1; // ready
-            default: rdata = 32'b0;
-        endcase
+    always @(posedge clk) begin
+        if (rst) begin
+            rdata <= 32'b0;
+        end else if (re) begin
+            case (addr)
+                5'h00: rdata <= op_a;
+                5'h04: rdata <= op_b;
+                5'h08: rdata <= {30'b0, op_sel};
+                5'h0c: rdata <= result_reg;
+                5'h10: rdata <= {31'b0, ready};
+                default: rdata <= 32'b0;
+            endcase
+        end
     end
 endmodule
 
