@@ -13,6 +13,24 @@ module bupt_riscv_tb();
     wire debug_memwrite;
     wire uart_tx_ready;
     wire uart_rx_valid;
+    wire[31:0] demo_pcF;
+    wire[31:0] demo_pcD;
+    wire[31:0] demo_pcE;
+    wire[31:0] demo_pcM;
+    wire[31:0] demo_pcW;
+    wire demo_validF;
+    wire demo_validD;
+    wire demo_validE;
+    wire demo_validM;
+    wire demo_validW;
+    wire demo_stallF;
+    wire demo_stallD;
+    wire demo_stall_loaduse;
+    wire demo_stall_muldiv;
+    wire demo_stall_dcache;
+    wire demo_stall_ifetch;
+    wire demo_flush_branch;
+    wire demo_flush_trap;
 
     wire ddr_backend_valid;
     wire ddr_backend_we;
@@ -41,6 +59,7 @@ module bupt_riscv_tb();
         .clk(clk),
         .bus_clk(bus_clk),
         .rst(rst),
+        .panel_switches_i(16'b0),
         .uart_rx_i(uart_rx_i),
         .uart_tx_o(uart_tx_o),
         .led(led),
@@ -58,7 +77,25 @@ module bupt_riscv_tb();
         .debug_dataadr(debug_dataadr),
         .debug_memwrite(debug_memwrite),
         .uart_tx_ready(uart_tx_ready),
-        .uart_rx_valid(uart_rx_valid)
+        .uart_rx_valid(uart_rx_valid),
+        .demo_pcF(demo_pcF),
+        .demo_pcD(demo_pcD),
+        .demo_pcE(demo_pcE),
+        .demo_pcM(demo_pcM),
+        .demo_pcW(demo_pcW),
+        .demo_validF(demo_validF),
+        .demo_validD(demo_validD),
+        .demo_validE(demo_validE),
+        .demo_validM(demo_validM),
+        .demo_validW(demo_validW),
+        .demo_stallF(demo_stallF),
+        .demo_stallD(demo_stallD),
+        .demo_stall_loaduse(demo_stall_loaduse),
+        .demo_stall_muldiv(demo_stall_muldiv),
+        .demo_stall_dcache(demo_stall_dcache),
+        .demo_stall_ifetch(demo_stall_ifetch),
+        .demo_flush_branch(demo_flush_branch),
+        .demo_flush_trap(demo_flush_trap)
         );
 
     ddr_model #(
