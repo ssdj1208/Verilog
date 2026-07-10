@@ -31,6 +31,7 @@ module simple_bus #(
     input wire ddr_backend_calib_done,
     input wire ddr_backend_busy,
 
+    input wire[15:0] panel_switches_i,
     input wire uart_rx_i,
     output wire uart_tx_o,
     output wire[15:0] led,
@@ -66,6 +67,7 @@ module simple_bus #(
     wire cache_sel_d = (d_addr[31:8] == 24'h100060);
     wire fp_sel_d = (d_addr[31:8] == 24'h100070);
     wire debug_sel_d = (d_addr[31:8] == 24'h100080);
+    wire panel_sel_d = (d_addr[31:8] == 24'h100090);
     wire ddr_sel_d = (d_addr[31:27] == 5'b10000);
 
     wire ddr_ready;
@@ -108,6 +110,7 @@ module simple_bus #(
     wire[31:0] perf_rdata;
     reg[31:0] cache_mmio_rdata;
     reg[31:0] debug_rdata;
+    wire[31:0] panel_rdata = {16'b0, panel_switches_i};
     wire[31:0] fp_rdata;
     wire timer_irq;
 
@@ -330,6 +333,7 @@ module simple_bus #(
                      cache_sel_d      ? cache_mmio_rdata :
                      fp_sel_d         ? fp_rdata :
                      debug_sel_d      ? debug_rdata :
+                     panel_sel_d      ? panel_rdata :
                      ddr_status_sel_d ? {30'b0, ddr_busy, ddr_calib_done} :
                      ddr_sel_d        ? cache_rdata : 32'b0;
 endmodule

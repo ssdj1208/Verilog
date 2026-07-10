@@ -7,6 +7,7 @@ module soc #(
     input wire clk,
     input wire bus_clk,
     input wire rst,
+    input wire[15:0] panel_switches_i,
     input wire uart_rx_i,
     output wire uart_tx_o,
     output wire[15:0] led,
@@ -26,7 +27,25 @@ module soc #(
     output wire[31:0] debug_dataadr,
     output wire debug_memwrite,
     output wire uart_tx_ready,
-    output wire uart_rx_valid
+    output wire uart_rx_valid,
+    output wire[31:0] demo_pcF,
+    output wire[31:0] demo_pcD,
+    output wire[31:0] demo_pcE,
+    output wire[31:0] demo_pcM,
+    output wire[31:0] demo_pcW,
+    output wire demo_validF,
+    output wire demo_validD,
+    output wire demo_validE,
+    output wire demo_validM,
+    output wire demo_validW,
+    output wire demo_stallF,
+    output wire demo_stallD,
+    output wire demo_stall_loaduse,
+    output wire demo_stall_muldiv,
+    output wire demo_stall_dcache,
+    output wire demo_stall_ifetch,
+    output wire demo_flush_branch,
+    output wire demo_flush_trap
     );
 
     wire[31:0] pc;
@@ -80,6 +99,18 @@ module soc #(
         .perf_stall_ifetch(perf_stall_ifetch),
         .perf_flush_branch(perf_flush_branch),
         .perf_flush_trap(perf_flush_trap),
+        .demo_pcF(demo_pcF),
+        .demo_pcD(demo_pcD),
+        .demo_pcE(demo_pcE),
+        .demo_pcM(demo_pcM),
+        .demo_pcW(demo_pcW),
+        .demo_validF(demo_validF),
+        .demo_validD(demo_validD),
+        .demo_validE(demo_validE),
+        .demo_validM(demo_validM),
+        .demo_validW(demo_validW),
+        .demo_stallF(demo_stallF),
+        .demo_stallD(demo_stallD),
         .debug_branch_pc(debug_branch_pc),
         .debug_branch_srca(debug_branch_srca),
         .debug_branch_srcb(debug_branch_srcb),
@@ -113,6 +144,7 @@ module soc #(
         .ddr_backend_resp_rdata(ddr_backend_resp_rdata),
         .ddr_backend_calib_done(ddr_backend_calib_done),
         .ddr_backend_busy(ddr_backend_busy),
+        .panel_switches_i(panel_switches_i),
         .uart_rx_i(uart_rx_i),
         .uart_tx_o(uart_tx_o),
         .led(led),
@@ -138,4 +170,10 @@ module soc #(
     assign debug_writedata = writedata;
     assign debug_dataadr = dataadr;
     assign debug_memwrite = memwrite;
+    assign demo_stall_loaduse = perf_stall_loaduse;
+    assign demo_stall_muldiv = perf_stall_muldiv;
+    assign demo_stall_dcache = perf_stall_dcache;
+    assign demo_stall_ifetch = perf_stall_ifetch;
+    assign demo_flush_branch = perf_flush_branch;
+    assign demo_flush_trap = perf_flush_trap;
 endmodule

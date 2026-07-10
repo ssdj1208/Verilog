@@ -24,6 +24,18 @@ module riscv(
     output wire perf_stall_ifetch,
     output wire perf_flush_branch,
     output wire perf_flush_trap,
+    output wire[31:0] demo_pcF,
+    output wire[31:0] demo_pcD,
+    output wire[31:0] demo_pcE,
+    output wire[31:0] demo_pcM,
+    output wire[31:0] demo_pcW,
+    output wire demo_validF,
+    output wire demo_validD,
+    output wire demo_validE,
+    output wire demo_validM,
+    output wire demo_validW,
+    output wire demo_stallF,
+    output wire demo_stallD,
     output reg[31:0] debug_branch_pc,
     output reg[31:0] debug_branch_srca,
     output reg[31:0] debug_branch_srcb,
@@ -331,10 +343,12 @@ module riscv(
     wire memreadM;
     wire[1:0] wbselM;
     wire[4:0] rdM;
+    wire[31:0] pcM;
     wire[31:0] pcplus4M;
     wire[31:0] aluResultM;
     wire[31:0] resultM;
 
+    wire[31:0] pcW;
     wire[31:0] aluoutW;
     wire[31:0] pcplus4W;
     wire[1:0] wbselW;
@@ -581,12 +595,14 @@ module riscv(
     wire[2:0] store_funct3M;
     wire[31:0] csr_rdataM;
     wire[31:0] csr_rdataW;
+    wire validM;
     wire exmem_bubbleE = divstallE | trap_take | redirectE;
     wire[31:0] forwardResultE = (wbselE == WB_PC4) ? pcplus4E :
                                 (wbselE == WB_CSR) ? csr_rdataE : executeResultE;
 
     flopenr #(32) exmem_alu(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : executeResultE, aluResultM);
     flopenr #(32) exmem_forward(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : forwardResultE, resultM);
+    flopenr #(32) exmem_pc(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : pcE, pcM);
     flopenr #(32) exmem_store(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : srcb_forwardE, storeDataM);
     flopenr #(32) exmem_pc4(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : pcplus4E, pcplus4M);
     flopenr #(5)  exmem_rd(clk, rst, ~memstallM, exmem_bubbleE ? 5'b0 : rdE, rdM);
@@ -595,6 +611,7 @@ module riscv(
     flopenr #(1)  exmem_regwrite(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (regwriteE & validE), regwriteM);
     flopenr #(1)  exmem_memread(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (memreadE & validE), memreadM);
     flopenr #(1)  exmem_memwrite(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : (memwriteE & validE), memwriteM);
+    flopenr #(1)  exmem_valid(clk, rst, ~memstallM, exmem_bubbleE ? 1'b0 : validE, validM);
     flopenr #(2)  exmem_wbsel(clk, rst, ~memstallM, exmem_bubbleE ? WB_ALU : wbselE, wbselM);
     flopenr #(32) exmem_csr(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : csr_rdataE, csr_rdataM);
 
@@ -608,13 +625,16 @@ module riscv(
 
     // MEM/WB
     wire validW;
+    wire retire_validW;
+    flopenr #(32) memwb_pc(clk, rst, ~memstallM, pcM, pcW);
     flopenr #(32) memwb_alu(clk, rst, ~memstallM, aluResultM, aluoutW);
     flopenr #(32) memwb_load(clk, rst, ~memstallM, loadDataM, loadDataW);
     flopenr #(32) memwb_pc4(clk, rst, ~memstallM, pcplus4M, pcplus4W);
     flopenr #(5)  memwb_rd(clk, rst, ~memstallM, rdM, rdW);
     flopenr #(2)  memwb_wbsel(clk, rst, ~memstallM, wbselM, wbselW);
     flopenr #(1)  memwb_regwrite(clk, rst, ~memstallM, regwriteM, regwriteW);
-    flopenr #(1)  memwb_valid(clk, rst, ~memstallM, (regwriteM | memreadM | memwriteM), validW);
+    flopenr #(1)  memwb_valid(clk, rst, ~memstallM, validM, validW);
+    flopenr #(1)  memwb_retire_valid(clk, rst, ~memstallM, (regwriteM | memreadM | memwriteM), retire_validW);
     flopenr #(32) memwb_csr(clk, rst, ~memstallM, csr_rdataM, csr_rdataW);
 
     assign resultW = (wbselW == WB_MEM) ? loadDataW :
@@ -668,7 +688,20 @@ module riscv(
         .targetE(bp_targetR)
         );
 
-    assign perf_retireW = validW & ~memstallM;
+    assign demo_pcF = pcF;
+    assign demo_pcD = pcD;
+    assign demo_pcE = pcE;
+    assign demo_pcM = pcM;
+    assign demo_pcW = pcW;
+    assign demo_validF = fetch_validF;
+    assign demo_validD = validD;
+    assign demo_validE = validE;
+    assign demo_validM = validM;
+    assign demo_validW = validW;
+    assign demo_stallF = stallF;
+    assign demo_stallD = stallD;
+
+    assign perf_retireW = retire_validW & ~memstallM;
     assign perf_branchE = validE & branchE & ~memstallM;
     assign perf_mispredictE = branch_redirect_reqE & ~memstallM;
     assign perf_stall = stallD | memstallM;
