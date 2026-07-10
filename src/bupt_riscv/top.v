@@ -230,6 +230,11 @@ module top(
     wire[31:0] demo_pcE;
     wire[31:0] demo_pcM;
     wire[31:0] demo_pcW;
+    wire[31:0] demo_instrF;
+    wire[31:0] demo_instrD;
+    wire[31:0] demo_instrE;
+    wire[31:0] demo_instrM;
+    wire[31:0] demo_instrW;
     wire demo_validF;
     wire demo_validD;
     wire demo_validE;
@@ -275,6 +280,11 @@ module top(
         .demo_pcE(demo_pcE),
         .demo_pcM(demo_pcM),
         .demo_pcW(demo_pcW),
+        .demo_instrF(demo_instrF),
+        .demo_instrD(demo_instrD),
+        .demo_instrE(demo_instrE),
+        .demo_instrM(demo_instrM),
+        .demo_instrW(demo_instrW),
         .demo_validF(demo_validF),
         .demo_validD(demo_validD),
         .demo_validE(demo_validE),
@@ -303,6 +313,11 @@ module top(
         .pcE_i(demo_pcE),
         .pcM_i(demo_pcM),
         .pcW_i(demo_pcW),
+        .instrF_i(demo_instrF),
+        .instrD_i(demo_instrD),
+        .instrE_i(demo_instrE),
+        .instrM_i(demo_instrM),
+        .instrW_i(demo_instrW),
         .validF_i(demo_validF),
         .validD_i(demo_validD),
         .validE_i(demo_validE),
