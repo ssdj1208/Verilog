@@ -13,6 +13,11 @@ module pipeline_demo_panel(
     input wire[31:0] pcE_i,
     input wire[31:0] pcM_i,
     input wire[31:0] pcW_i,
+    input wire[31:0] instrF_i,
+    input wire[31:0] instrD_i,
+    input wire[31:0] instrE_i,
+    input wire[31:0] instrM_i,
+    input wire[31:0] instrW_i,
     input wire validF_i,
     input wire validD_i,
     input wire validE_i,
@@ -40,11 +45,17 @@ module pipeline_demo_panel(
         (stage_sel_i == 3'd3) ? pcM_i :
         (stage_sel_i == 3'd4) ? pcW_i : pcF_i;
 
-    wire [3:0] stall_digit = {stall_dcache_i, stall_ifetch_i, stall_muldiv_i, stall_loaduse_i};
-    wire [3:0] flush_digit = {2'b00, flush_trap_i, flush_branch_i};
-    wire [3:0] mode_digit =
-        run_active_i ? (speed_sel_i ? 4'hA : 4'h2) :
-        (speed_sel_i ? 4'h1 : 4'h0);
+    wire [31:0] detail_instr =
+        (stage_sel_i == 3'd1) ? instrD_i :
+        (stage_sel_i == 3'd2) ? instrE_i :
+        (stage_sel_i == 3'd3) ? instrM_i :
+        (stage_sel_i == 3'd4) ? instrW_i : instrF_i;
+
+    wire detail_valid =
+        (stage_sel_i == 3'd1) ? validD_i :
+        (stage_sel_i == 3'd2) ? validE_i :
+        (stage_sel_i == 3'd3) ? validM_i :
+        (stage_sel_i == 3'd4) ? validW_i : validF_i;
 
     reg [3:0] hex_digit;
     reg dp_en;
@@ -119,18 +130,7 @@ module pipeline_demo_panel(
 
         if (!page_o) begin
             case (scan_idx)
-                3'd0: begin hex_digit = mode_digit;   dp_en = 1'b0; end
-                3'd1: begin hex_digit = flush_digit;  dp_en = 1'b0; end
-                3'd2: begin hex_digit = stall_digit;  dp_en = 1'b0; end
-                3'd3: begin hex_digit = pcW_i[5:2];   dp_en = validW_i; end
-                3'd4: begin hex_digit = pcM_i[5:2];   dp_en = validM_i; end
-                3'd5: begin hex_digit = pcE_i[5:2];   dp_en = validE_i; end
-                3'd6: begin hex_digit = pcD_i[5:2];   dp_en = validD_i; end
-                default: begin hex_digit = pcF_i[5:2]; dp_en = validF_i; end
-            endcase
-        end else begin
-            case (scan_idx)
-                3'd0: begin hex_digit = detail_pc[3:0];   dp_en = 1'b0; end
+                3'd0: begin hex_digit = detail_pc[3:0];   dp_en = detail_valid; end
                 3'd1: begin hex_digit = detail_pc[7:4];   dp_en = 1'b0; end
                 3'd2: begin hex_digit = detail_pc[11:8];  dp_en = 1'b0; end
                 3'd3: begin hex_digit = detail_pc[15:12]; dp_en = 1'b0; end
@@ -138,6 +138,17 @@ module pipeline_demo_panel(
                 3'd5: begin hex_digit = detail_pc[23:20]; dp_en = 1'b0; end
                 3'd6: begin hex_digit = detail_pc[27:24]; dp_en = 1'b0; end
                 default: begin hex_digit = detail_pc[31:28]; dp_en = 1'b0; end
+            endcase
+        end else begin
+            case (scan_idx)
+                3'd0: begin hex_digit = detail_instr[3:0];   dp_en = 1'b0; end
+                3'd1: begin hex_digit = detail_instr[7:4];   dp_en = 1'b0; end
+                3'd2: begin hex_digit = detail_instr[11:8];  dp_en = 1'b0; end
+                3'd3: begin hex_digit = detail_instr[15:12]; dp_en = 1'b0; end
+                3'd4: begin hex_digit = detail_instr[19:16]; dp_en = 1'b0; end
+                3'd5: begin hex_digit = detail_instr[23:20]; dp_en = 1'b0; end
+                3'd6: begin hex_digit = detail_instr[27:24]; dp_en = 1'b0; end
+                default: begin hex_digit = detail_instr[31:28]; dp_en = 1'b0; end
             endcase
         end
 

@@ -29,6 +29,11 @@ module riscv(
     output wire[31:0] demo_pcE,
     output wire[31:0] demo_pcM,
     output wire[31:0] demo_pcW,
+    output wire[31:0] demo_instrF,
+    output wire[31:0] demo_instrD,
+    output wire[31:0] demo_instrE,
+    output wire[31:0] demo_instrM,
+    output wire[31:0] demo_instrW,
     output wire demo_validF,
     output wire demo_validD,
     output wire demo_validE,
@@ -327,6 +332,7 @@ module riscv(
 
     // ID/EX
     wire[31:0] pcE, pcplus4E, rd1E, rd2E, immE;
+    wire[31:0] instrE;
     wire[4:0] rs1E, rs2E, rdE;
     wire[2:0] funct3E, load_funct3E, store_funct3E;
     wire regwriteE, memreadE, memwriteE, alusrcE, branchE, jumpE, jalrE;
@@ -371,6 +377,7 @@ module riscv(
 
     flopenrc #(32) idex_pc(clk, rst, idex_en, flushE, pcD, pcE);
     flopenrc #(32) idex_pc4(clk, rst, idex_en, flushE, pcplus4D, pcplus4E);
+    flopenrc #(32) idex_instr(clk, rst, idex_en, flushE, instrD, instrE);
     flopenrc #(32) idex_rd1(clk, rst, idex_en, flushE, rd1D, rd1E);
     flopenrc #(32) idex_rd2(clk, rst, idex_en, flushE, rd2D, rd2E);
     flopenrc #(32) idex_imm(clk, rst, idex_en, flushE, immD, immE);
@@ -591,6 +598,7 @@ module riscv(
 
     // EX/MEM
     wire[31:0] storeDataM;
+    wire[31:0] instrM;
     wire[2:0] load_funct3M;
     wire[2:0] store_funct3M;
     wire[31:0] csr_rdataM;
@@ -603,6 +611,7 @@ module riscv(
     flopenr #(32) exmem_alu(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : executeResultE, aluResultM);
     flopenr #(32) exmem_forward(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : forwardResultE, resultM);
     flopenr #(32) exmem_pc(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : pcE, pcM);
+    flopenr #(32) exmem_instr(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : instrE, instrM);
     flopenr #(32) exmem_store(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : srcb_forwardE, storeDataM);
     flopenr #(32) exmem_pc4(clk, rst, ~memstallM, exmem_bubbleE ? 32'b0 : pcplus4E, pcplus4M);
     flopenr #(5)  exmem_rd(clk, rst, ~memstallM, exmem_bubbleE ? 5'b0 : rdE, rdM);
@@ -626,7 +635,9 @@ module riscv(
     // MEM/WB
     wire validW;
     wire retire_validW;
+    wire[31:0] instrW;
     flopenr #(32) memwb_pc(clk, rst, ~memstallM, pcM, pcW);
+    flopenr #(32) memwb_instr(clk, rst, ~memstallM, instrM, instrW);
     flopenr #(32) memwb_alu(clk, rst, ~memstallM, aluResultM, aluoutW);
     flopenr #(32) memwb_load(clk, rst, ~memstallM, loadDataM, loadDataW);
     flopenr #(32) memwb_pc4(clk, rst, ~memstallM, pcplus4M, pcplus4W);
@@ -693,6 +704,11 @@ module riscv(
     assign demo_pcE = pcE;
     assign demo_pcM = pcM;
     assign demo_pcW = pcW;
+    assign demo_instrF = fetch_validF ? instrF : 32'b0;
+    assign demo_instrD = instrD;
+    assign demo_instrE = instrE;
+    assign demo_instrM = instrM;
+    assign demo_instrW = instrW;
     assign demo_validF = fetch_validF;
     assign demo_validD = validD;
     assign demo_validE = validE;

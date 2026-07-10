@@ -3,7 +3,7 @@
 module demo_clock_ctrl #(
     parameter integer SLOW_DIV = 25000000,
     parameter integer FAST_DIV = 5000000,
-    parameter integer STARTUP_PULSES = 32
+    parameter integer STARTUP_PULSES = 14
 )(
     input wire clk_i,
     input wire rst_i,
