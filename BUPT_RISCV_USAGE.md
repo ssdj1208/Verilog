@@ -16,6 +16,7 @@ scripts/sim_bupt_riscv.tcl       Vivado 仿真脚本
 scripts/build_bupt_riscv.tcl     Vivado 综合/实现/bitstream 脚本
 scripts/program_bupt_riscv.tcl   NEXYS4 下载脚本
 constr/nexys4ddr_bupt_riscv.xdc  NEXYS4 约束文件
+tools/riscv_instruction_builder.py  Boot ROM 图形化指令构造器
 ```
 
 主要能力：
@@ -29,6 +30,7 @@ constr/nexys4ddr_bupt_riscv.xdc  NEXYS4 约束文件
 - FP32 MMIO 浮点协处理器，支持正规格化单精度加法和乘法演示。
 - GPIO、UART、DDR status/data、performance counter MMIO。
 - RISC-V boot ROM 自测和串口 shell。
+- NEXYS4 DDR 五级流水演示模式，支持暂停、单步、变速和 PC/指令显示。
 
 ## 2. 环境要求
 

@@ -23,6 +23,7 @@ PERF_BASE = 0x10005000
 CACHE_BASE = 0x10006000
 FP_BASE = 0x10007000
 DEBUG_BASE = 0x10008000
+PANEL_BASE = 0x10009000
 DDR_BASE = 0x80000000
 BRAM_BASE = 0x00010000
 
@@ -304,6 +305,11 @@ def print_snapshot_tail(skip_offsets=()):
 # 每个自检成功后会通过 UART 打印一行 PASS/OK/READY；失败则进入对应 fail 死循环。
 label("_start")
 li("sp", BRAM_BASE + 0x1000)
+li("t0", PANEL_BASE)
+lw("t1", 0, "t0")
+li("t2", 0x8000)
+and_("t1", "t1", "t2")
+bne("t1", "zero", "pipeline_demo_entry")
 puts_label("msg_banner")
 call("run_isa_tests")
 puts_label("msg_isa_pass")
@@ -315,6 +321,36 @@ call("fp_test")
 puts_label("msg_perf_ready")
 call("print_prompt")
 j("shell_loop")
+
+# 演示模式运行一段可重复的短程序，稳定触发前递、load-use、除法停顿和分支冲刷。
+label("pipeline_demo_entry")
+li("s0", BRAM_BASE + 0x200)
+li("s1", 0)
+li("t0", 0x10)
+sw("t0", 0, "s0")
+
+label("pipeline_demo_loop")
+addi("t1", "zero", 5)
+addi("t2", "t1", 3)
+add("t3", "t2", "t1")
+sub("t4", "t3", "t1")
+sw("t4", 4, "s0")
+lw("t5", 4, "s0")
+add("t6", "t5", "t1")
+div("s2", "t6", "t1")
+addi("s3", "s2", 1)
+xori("s1", "s1", 1)
+andi("s4", "s1", 1)
+beq("s4", "zero", "pipeline_demo_taken")
+addi("s5", "s3", 2)
+j("pipeline_demo_store")
+
+label("pipeline_demo_taken")
+add("s5", "s3", "t4")
+
+label("pipeline_demo_store")
+sw("s5", 8, "s0")
+j("pipeline_demo_loop")
 
 # RV32I 基础指令自检。覆盖算术逻辑、移位、比较、load/store 字节半字扩展、
 # 分支跳转和 auipc/jalr。每一步都用 expect 检查结果。

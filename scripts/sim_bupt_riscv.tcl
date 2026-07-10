@@ -29,25 +29,35 @@ foreach rtl $soc_files {
         add_files $rtl
     }
 }
-add_files -fileset sim_1 [file join $repo_dir sim bupt_riscv_tb.v]
-set_property top bupt_riscv_tb [get_filesets sim_1]
+set sim_files [glob -nocomplain [file join $repo_dir sim *.v]]
+if {[llength $sim_files] == 0} {
+    error "No simulation testbenches found under sim/*.v"
+}
+add_files -fileset sim_1 $sim_files
 update_compile_order -fileset sim_1
 
-launch_simulation -simset sim_1 -mode behavioral
-restart
-run all
-close_sim
-set sim_log [file join $proj_dir bupt_riscv_sim.sim sim_1 behav xsim simulate.log]
-if {![file exists $sim_log]} {
-    error "BUPT RISC-V simulation log not found: $sim_log"
+proc run_tb {proj_dir tb_name success_marker} {
+    set_property top $tb_name [get_filesets sim_1]
+    launch_simulation -simset sim_1 -mode behavioral
+    restart
+    run all
+    close_sim
+    set sim_log [file join $proj_dir bupt_riscv_sim.sim sim_1 behav xsim simulate.log]
+    if {![file exists $sim_log]} {
+        error "Simulation log not found for $tb_name: $sim_log"
+    }
+    set fh [open $sim_log r]
+    set log_text [read $fh]
+    close $fh
+    if {[string first "Simulation Failed" $log_text] >= 0} {
+        error "Simulation reported failure for $tb_name"
+    }
+    if {[string first $success_marker $log_text] < 0} {
+        error "Simulation success marker not found for $tb_name"
+    }
 }
-set fh [open $sim_log r]
-set log_text [read $fh]
-close $fh
-if {[string first "Simulation Failed" $log_text] >= 0} {
-    error "BUPT RISC-V simulation reported failure"
-}
-if {[string first "Simulation succeeded: BUPT RISC-V CPU verified" $log_text] < 0} {
-    error "BUPT RISC-V simulation success marker not found"
-}
+
+run_tb $proj_dir bupt_riscv_tb "Simulation succeeded: BUPT RISC-V CPU verified"
+run_tb $proj_dir bupt_riscv_demo_tb "Simulation succeeded: pipeline demo stepping verified"
+run_tb $proj_dir pipeline_demo_panel_tb "Simulation succeeded: pipeline demo panel verified"
 puts "BUPT_RISCV_SIM_DONE"

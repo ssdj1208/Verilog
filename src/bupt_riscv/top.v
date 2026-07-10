@@ -2,10 +2,14 @@
 
 module top(
     input wire clk100mhz,
-    input wire rst,
+    input wire[4:0] btn,
+    input wire[15:0] sw,
     input wire uart_rx_i,
     output wire uart_tx_o,
     output wire[15:0] led,
+    output wire[7:0] an,
+    output wire[6:0] seg,
+    output wire dp,
 
     inout wire[15:0] ddr2_dq,
     inout wire[1:0] ddr2_dqs_n,
@@ -23,13 +27,22 @@ module top(
     output wire[0:0] ddr2_odt
     );
 
+    localparam BTN_U = 0;
+    localparam BTN_L = 1;
+    localparam BTN_C = 2;
+    localparam BTN_R = 3;
+    localparam BTN_D = 4;
+
+    wire rst_btn = btn[BTN_C];
+
     // Hold MIG in reset for a short time after FPGA configuration. This keeps
     // the board-level reset behavior deterministic before DDR calibration starts.
     reg[19:0] por_count = 20'd0;
     reg por_rst = 1'b1;
+    reg demo_mode_latched = 1'b0;
 
-    always @(posedge clk100mhz or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk100mhz or posedge rst_btn) begin
+        if (rst_btn) begin
             por_count <= 20'd0;
             por_rst <= 1'b1;
         end else if (por_count != 20'hfffff) begin
@@ -40,16 +53,63 @@ module top(
         end
     end
 
+    always @(posedge clk100mhz) begin
+        if (rst_btn || por_rst) begin
+            demo_mode_latched <= sw[15];
+        end
+    end
+
     wire mig_sys_clk_200mhz;
     wire soc_clk_100mhz;
     wire clkgen_locked;
 
     clock_gen clkgen(
         .clk100(clk100mhz),
-        .rst(rst),
+        .rst(rst_btn),
         .mig_sys_clk_200mhz(mig_sys_clk_200mhz),
         .soc_clk_100mhz(soc_clk_100mhz),
         .locked(clkgen_locked)
+        );
+
+    wire run_btn_level;
+    wire run_btn_pulse;
+    wire step_btn_level;
+    wire step_btn_pulse;
+    wire page_btn_level;
+    wire page_btn_pulse;
+    wire speed_btn_level;
+    wire speed_btn_pulse;
+
+    button_edge run_btn(
+        .clk(soc_clk_100mhz),
+        .rst(por_rst),
+        .raw_i(btn[BTN_U]),
+        .level_o(run_btn_level),
+        .pressed_o(run_btn_pulse)
+        );
+
+    button_edge step_btn(
+        .clk(soc_clk_100mhz),
+        .rst(por_rst),
+        .raw_i(btn[BTN_L]),
+        .level_o(step_btn_level),
+        .pressed_o(step_btn_pulse)
+        );
+
+    button_edge page_btn(
+        .clk(soc_clk_100mhz),
+        .rst(por_rst),
+        .raw_i(btn[BTN_R]),
+        .level_o(page_btn_level),
+        .pressed_o(page_btn_pulse)
+        );
+
+    button_edge speed_btn(
+        .clk(soc_clk_100mhz),
+        .rst(por_rst),
+        .raw_i(btn[BTN_D]),
+        .level_o(speed_btn_level),
+        .pressed_o(speed_btn_pulse)
         );
 
     wire ui_clk;
@@ -106,9 +166,25 @@ module top(
 
     reg[3:0] rst_sync;
     wire soc_rst;
-    wire soc_clk = soc_clk_100mhz;
-    wire bus_clk = soc_clk_100mhz;
+    wire soc_clk;
+    wire bus_clk;
     wire backend_clk = ui_clk;
+    wire demo_run_active;
+    wire demo_speed_sel;
+
+    demo_clock_ctrl demo_clk_ctrl(
+        .clk_i(soc_clk_100mhz),
+        .rst_i(por_rst),
+        .demo_mode_i(demo_mode_latched),
+        .run_toggle_i(run_btn_pulse),
+        .step_i(step_btn_pulse),
+        .speed_toggle_i(speed_btn_pulse),
+        .soc_clk_o(soc_clk),
+        .run_active_o(demo_run_active),
+        .speed_sel_o(demo_speed_sel)
+        );
+
+    assign bus_clk = soc_clk;
 
     always @(posedge soc_clk or posedge por_rst) begin
         if (por_rst) begin
@@ -146,17 +222,46 @@ module top(
     wire debug_memwrite;
     wire uart_tx_ready;
     wire uart_rx_valid;
+    wire[15:0] soc_led;
+    wire[15:0] demo_led;
+    wire[7:0] demo_an;
+    wire[6:0] demo_seg;
+    wire demo_dp;
+    wire[31:0] demo_pcF;
+    wire[31:0] demo_pcD;
+    wire[31:0] demo_pcE;
+    wire[31:0] demo_pcM;
+    wire[31:0] demo_pcW;
+    wire[31:0] demo_instrF;
+    wire[31:0] demo_instrD;
+    wire[31:0] demo_instrE;
+    wire[31:0] demo_instrM;
+    wire[31:0] demo_instrW;
+    wire demo_validF;
+    wire demo_validD;
+    wire demo_validE;
+    wire demo_validM;
+    wire demo_validW;
+    wire demo_stallF;
+    wire demo_stallD;
+    wire demo_stall_loaduse;
+    wire demo_stall_muldiv;
+    wire demo_stall_dcache;
+    wire demo_stall_ifetch;
+    wire demo_flush_branch;
+    wire demo_flush_trap;
 
     soc #(
-        .UART_CLKS_PER_BIT(868),       // 100 MHz / 115200 baud
-        .TIMER_TICK_CYCLES(32'd1000000) // ~10 ms at 100 MHz
+        .UART_CLKS_PER_BIT(868),
+        .TIMER_TICK_CYCLES(32'd1000000)
     ) soc(
         .clk(soc_clk),
         .bus_clk(bus_clk),
         .rst(soc_rst),
+        .panel_switches_i({demo_mode_latched, sw[14:0]}),
         .uart_rx_i(uart_rx_i),
         .uart_tx_o(uart_tx_o),
-        .led(led),
+        .led(soc_led),
         .ddr_backend_valid(ddr_backend_valid),
         .ddr_backend_we(ddr_backend_we),
         .ddr_backend_wstrb(ddr_backend_wstrb),
@@ -171,8 +276,72 @@ module top(
         .debug_dataadr(debug_dataadr),
         .debug_memwrite(debug_memwrite),
         .uart_tx_ready(uart_tx_ready),
-        .uart_rx_valid(uart_rx_valid)
+        .uart_rx_valid(uart_rx_valid),
+        .demo_pcF(demo_pcF),
+        .demo_pcD(demo_pcD),
+        .demo_pcE(demo_pcE),
+        .demo_pcM(demo_pcM),
+        .demo_pcW(demo_pcW),
+        .demo_instrF(demo_instrF),
+        .demo_instrD(demo_instrD),
+        .demo_instrE(demo_instrE),
+        .demo_instrM(demo_instrM),
+        .demo_instrW(demo_instrW),
+        .demo_validF(demo_validF),
+        .demo_validD(demo_validD),
+        .demo_validE(demo_validE),
+        .demo_validM(demo_validM),
+        .demo_validW(demo_validW),
+        .demo_stallF(demo_stallF),
+        .demo_stallD(demo_stallD),
+        .demo_stall_loaduse(demo_stall_loaduse),
+        .demo_stall_muldiv(demo_stall_muldiv),
+        .demo_stall_dcache(demo_stall_dcache),
+        .demo_stall_ifetch(demo_stall_ifetch),
+        .demo_flush_branch(demo_flush_branch),
+        .demo_flush_trap(demo_flush_trap)
         );
+
+    pipeline_demo_panel demo_panel(
+        .clk(soc_clk_100mhz),
+        .rst(por_rst),
+        .demo_mode_i(demo_mode_latched),
+        .page_toggle_i(page_btn_pulse),
+        .stage_sel_i(sw[2:0]),
+        .run_active_i(demo_run_active),
+        .speed_sel_i(demo_speed_sel),
+        .pcF_i(demo_pcF),
+        .pcD_i(demo_pcD),
+        .pcE_i(demo_pcE),
+        .pcM_i(demo_pcM),
+        .pcW_i(demo_pcW),
+        .instrF_i(demo_instrF),
+        .instrD_i(demo_instrD),
+        .instrE_i(demo_instrE),
+        .instrM_i(demo_instrM),
+        .instrW_i(demo_instrW),
+        .validF_i(demo_validF),
+        .validD_i(demo_validD),
+        .validE_i(demo_validE),
+        .validM_i(demo_validM),
+        .validW_i(demo_validW),
+        .stall_loaduse_i(demo_stall_loaduse),
+        .stall_muldiv_i(demo_stall_muldiv),
+        .stall_ifetch_i(demo_stall_ifetch),
+        .stall_dcache_i(demo_stall_dcache),
+        .flush_branch_i(demo_flush_branch),
+        .flush_trap_i(demo_flush_trap),
+        .led_o(demo_led),
+        .an_o(demo_an),
+        .seg_o(demo_seg),
+        .dp_o(demo_dp),
+        .page_o()
+        );
+
+    assign led = demo_mode_latched ? demo_led : soc_led;
+    assign an = demo_mode_latched ? demo_an : 8'hff;
+    assign seg = demo_mode_latched ? demo_seg : 7'h7f;
+    assign dp = demo_mode_latched ? demo_dp : 1'b1;
 
     ddr_backend_cdc ddr_cdc(
         .bus_clk(bus_clk),

@@ -7,6 +7,10 @@
 - 详细使用说明：[docs/USAGE_GUIDE.md](docs/USAGE_GUIDE.md)
 - 项目完成度分析：[docs/PROJECT_COMPLETION_ANALYSIS.md](docs/PROJECT_COMPLETION_ANALYSIS.md)
 - Vivado 构建与 PPA 摘要：[docs/bupt_riscv_build_summary.md](docs/bupt_riscv_build_summary.md)
+- 流水演示使用指南：[docs/PIPELINE_DEMO_GUIDE.md](docs/PIPELINE_DEMO_GUIDE.md)
+- 流水演示讲解稿：[docs/PIPELINE_DEMO_TALK.md](docs/PIPELINE_DEMO_TALK.md)
+- 流水演示实板验证：[docs/PIPELINE_DEMO_BOARD_VALIDATION.md](docs/PIPELINE_DEMO_BOARD_VALIDATION.md)
+- 指令构造工具：[tools/README.md](tools/README.md)
 - 原始详细使用记录：[BUPT_RISCV_USAGE.md](BUPT_RISCV_USAGE.md)
 - 原始题目符合性审查：[BUPT_PROJECT_B_AUDIT.md](BUPT_PROJECT_B_AUDIT.md)
 
@@ -18,6 +22,8 @@ src/bupt_riscv/riscv_core/       RV32I 五级流水 CPU 核
 src/common/                      通用 UART 收发模块
 software/bupt_riscv/             Boot ROM 生成脚本和指令 listing
 sim/bupt_riscv_tb.v              Vivado 行为级仿真 testbench
+sim/bupt_riscv_demo_tb.v         流水暂停、单步和冒险事件 testbench
+tools/riscv_instruction_builder.py  Boot ROM 图形化指令构造器
 scripts/sim_bupt_riscv.tcl       Vivado 仿真脚本
 scripts/build_bupt_riscv.tcl     Vivado 综合、实现、bitstream 生成脚本
 scripts/program_bupt_riscv.tcl   NEXYS4 DDR 下载脚本
@@ -34,6 +40,7 @@ docs/                            使用说明、完成度分析、构建摘要
 - SoC 外设：Boot ROM、BRAM、UART、GPIO、Timer、DDR Bridge、性能计数 MMIO。
 - 拓展功能：2 路组相联 LRU D-Cache、RV32M 乘除法、FP32 MMIO 浮点协处理器。
 - Boot 自测和串口 shell：`help`、`mem`、`cache`、`fp`、`perf`、`led 1`、`run demo`。
+- 板上流水演示：运行/暂停、单步、变速、五级 PC/指令显示及 stall/flush LED。
 
 ## 四、快速开始
 
