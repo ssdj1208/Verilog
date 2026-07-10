@@ -25,7 +25,7 @@ file copy -force [file join $repo_dir src bupt_riscv bupt_riscv_boot.mem] [file 
 add_files $common_files
 add_files $core_files
 foreach rtl $soc_files {
-    if {[lsearch -exact {top.v clk_100_to_200.v mig_axi_adapter.v} [file tail $rtl]] < 0} {
+    if {[lsearch -exact {top.v clock_gen.v mig_axi_adapter.v} [file tail $rtl]] < 0} {
         add_files $rtl
     }
 }

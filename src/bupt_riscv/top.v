@@ -40,18 +40,16 @@ module top(
         end
     end
 
-    wire clk200mhz;
-    wire clk50mhz;
-    wire clk50mhz_180;
-    wire clk200_locked;
+    wire mig_sys_clk_200mhz;
+    wire soc_clk_100mhz;
+    wire clkgen_locked;
 
-    clk_100_to_200 clkgen(
+    clock_gen clkgen(
         .clk100(clk100mhz),
         .rst(rst),
-        .clk200(clk200mhz),
-        .clk50(clk50mhz),
-        .clk50_180(clk50mhz_180),
-        .locked(clk200_locked)
+        .mig_sys_clk_200mhz(mig_sys_clk_200mhz),
+        .soc_clk_100mhz(soc_clk_100mhz),
+        .locked(clkgen_locked)
         );
 
     wire ui_clk;
@@ -108,8 +106,8 @@ module top(
 
     reg[3:0] rst_sync;
     wire soc_rst;
-    wire soc_clk = clk50mhz;
-    wire bus_clk = clk50mhz;
+    wire soc_clk = soc_clk_100mhz;
+    wire bus_clk = soc_clk_100mhz;
     wire backend_clk = ui_clk;
 
     always @(posedge soc_clk or posedge por_rst) begin
@@ -255,7 +253,7 @@ module top(
         .s_axi_rready(s_axi_rready)
         );
 
-    lab10_mig u_lab10_mig(
+    bupt_riscv_mig u_bupt_riscv_mig(
         .ddr2_addr(ddr2_addr),
         .ddr2_ba(ddr2_ba),
         .ddr2_cas_n(ddr2_cas_n),
@@ -323,7 +321,7 @@ module top(
         .s_axi_rlast(s_axi_rlast),
         .s_axi_rvalid(s_axi_rvalid),
         .s_axi_rready(s_axi_rready),
-        .sys_clk_i(clk200mhz),
-        .sys_rst(~por_rst & clk200_locked)
+        .sys_clk_i(mig_sys_clk_200mhz),
+        .sys_rst(~por_rst & clkgen_locked)
         );
 endmodule

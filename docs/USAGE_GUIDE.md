@@ -145,7 +145,7 @@ PERF READY
 ```text
 help       打印命令列表
 mem        运行内存/DDR 检查
-cache      打印 Cache 统计信息
+cache      运行 D-Cache/LRU 自测，成功时输出 CACHE READY
 fp         运行 FP32 MMIO 演示
 perf       打印 cycle、retired、branch、mispredict、stall 计数器
 led 1      点亮 LED 输出

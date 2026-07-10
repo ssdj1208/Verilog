@@ -1,6 +1,6 @@
 # BUPT RISC-V CPU 项目使用说明
 
-本文档说明如何使用本仓库中的北邮题目 B 改造项目：`bupt_riscv`。该项目基于原 `step_into_mips` 的 SoC 外壳，新增 RV32I 课程子集五级流水 CPU、分支预测、性能计数器、RISC-V boot 程序和 Vivado 脚本。
+本文档说明如何使用本仓库中的北邮题目 B 改造项目：`bupt_riscv`。该项目源自早期教学 SoC 外壳，当前已整理为独立的 BUPT RISC-V 工程，包含 RV32I 课程子集五级流水 CPU、分支预测、性能计数器、RISC-V boot 程序和 Vivado 脚本。
 
 ## 1. 项目内容
 
@@ -24,7 +24,7 @@ constr/nexys4ddr_bupt_riscv.xdc  NEXYS4 约束文件
 - IF/ID/EX/MEM/WB 五级流水。
 - 数据前递、load-use 暂停、DDR wait-state 暂停。
 - 64 项 BTB/BHT 分支预测器。
-- 16 组 2 路 LRU D-Cache，带 hit/miss/replacement 统计。
+- 16 组 2 路、4-word line LRU D-Cache，带 hit/miss/replacement/refill 统计。
 - RV32M 乘除法扩展：`mul/mulh/mulhsu/mulhu/div/divu/rem/remu`。
 - FP32 MMIO 浮点协处理器，支持正规格化单精度加法和乘法演示。
 - GPIO、UART、DDR status/data、performance counter MMIO。

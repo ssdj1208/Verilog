@@ -38,7 +38,7 @@ software/bupt_riscv/gen_bupt_boot.py
 
 ### 1.2 性能基线
 
-当前顶层输入系统时钟为 100 MHz。最新实测版本为 2026-07-08 `build19`，SoC/CPU 时钟约束为 100 MHz；RTL 中部分信号仍沿用 `clk50mhz` / `clk50_unbuf` 的历史命名，但 Vivado clock summary 显示 `clk50_unbuf` period 为 10.000 ns，即 100.000 MHz。因此当前性能计数器中的 `cycles` 按 100 MHz 换算时间：
+当前顶层输入系统时钟为 100 MHz。最新实现报告来自 2026-07-09 clean-name rebuild，最新实板测试记录为 2026-07-08 `build19`；SoC/CPU 时钟约束为 100 MHz。RTL 时钟命名已统一为 `soc_clk_100mhz` / `soc_clk_100_unbuf`，Vivado clock summary 显示该时钟 period 为 10.000 ns，即 100.000 MHz。因此当前性能计数器中的 `cycles` 按 100 MHz 换算时间：
 
 ```text
 运行时间(s) = cycles / 100,000,000
@@ -48,7 +48,7 @@ stall_rate = stalls / cycles
 branch_miss_rate = mispredicts / branches
 ```
 
-最新 `build19` 实现报告可作为当前 PPA 基线：
+最新 clean-name rebuild 实现报告可作为当前 PPA 基线：
 
 ```text
 WNS = 0.080 ns
@@ -274,7 +274,7 @@ int stat     打印 tick 计数和 irq pending
 
 ### 4.1 目标设定
 
-规划初始基线曾以 50 MHz SoC 主频为目标起点；当前 `build19` 已实现 100 MHz 稳定运行。本节保留提频阶段设计思路，用于说明从旧基线到当前版本的优化路径：
+规划初始基线曾以 50 MHz SoC 主频为目标起点；当前 clean-name rebuild 已实现 100 MHz 稳定运行。本节保留提频阶段设计思路，用于说明从旧基线到当前版本的优化路径：
 
 ```text
 第一目标：75 MHz 稳定通过实现
@@ -889,13 +889,15 @@ DDR 校准正常
 | --- | --- | --- | --- |
 | M0 | 建立 benchmark 和 `perf clear` | 已实现。支持 `perf`, `perf clear`, `bench alu`, `bench mem`, `bench branch`；`bench` 内部输出快照字段，避免 shell idle 污染 benchmark 数据。 | 串口 `help` 列出命令；`perf clear` 返回 `OK`；三类 benchmark 连续两次可复现。 |
 | M1 | Timer interrupt 跑通 | 已实现。CPU 支持最小 machine-mode CSR/trap/mret，boot shell 支持 `int on/off/stat`。 | `int on` 后 tick 从 `0x00000000` 增至 `0x000000FF`、`0x000001FE`，shell 仍可交互。 |
-| M2 | 75 MHz 稳定 | 已被 100 MHz 稳定实现覆盖；未单独保留 75 MHz bitstream 表。 | `clk50_unbuf` 实际 period 10.000 ns / 100.000 MHz，routed WNS `+0.080 ns`。 |
+| M2 | 75 MHz 稳定 | 已被 100 MHz 稳定实现覆盖；未单独保留 75 MHz bitstream 表。 | `soc_clk_100_unbuf` 实际 period 10.000 ns / 100.000 MHz，routed WNS `+0.080 ns`。 |
 | M3 | I-Cache 跑通 | 已实现。`icache.v` 为 64 lines、4-word line、1 KB 只读 I-Cache，miss 时整行 refill。 | Boot、自测、串口 benchmark 均通过；benchmark 中 `stall_if` 维持在几十到百周期量级。 |
 | M4 | D-Cache 多 word line | 已实现。`dcache_2way_lru.v` 为 2-way、4-word line，带 hit/miss/refill 计数。 | `bench mem` 两次 cycles 为 `0x5405`、`0x540D`，misses 均为 `0x140`。 |
 | M5 | 100 MHz 稳定 | 已实现。UART 分频为 868，Timer tick 配置为 100 MHz 口径。 | 上板串口 115200 无乱码；Vivado timing 全部满足。 |
 | M6 | CPI 细分优化 | 已实现细分计数和实测表。当前已输出 `stall_lu/md/dc/if/ddr`、`flush_br/tr`，可定位 CPI 来源。 | `bench alu/mem/branch` 均打印 cycles/retired/stalls/branch/miss 相关字段。 |
 
-### 12.3 build19 PPA
+### 12.3 PPA 基线
+
+本表使用 2026-07-09 clean-name rebuild 的实现报告；2026-07-08 `build19` 保留为实板串口和 benchmark 记录。
 
 | 项目 | 实测/报告值 |
 | --- | ---: |

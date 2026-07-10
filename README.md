@@ -1,6 +1,6 @@
 # 北邮项目式课程阶段二题目 B：RISC-V CPU 项目
 
-本仓库是面向北京邮电大学《项目式课程阶段二》题目 B 的独立交付版本，目标是在 NEXYS4 DDR 板卡上实现一个基于 **RV32I 课程子集** 的五级流水 CPU SoC。当前工程已使用 Vivado 2023.2 完成综合、实现和 bitstream 生成，目录中只保留北邮 RISC-V 项目相关内容，不包含原始 MIPS lab、原始文档、XPR 工程或无关实验文件。
+本目录是面向北京邮电大学《项目式课程阶段二》题目 B 的独立交付版本，目标是在 NEXYS4 DDR 板卡上实现一个基于 **RV32I 课程子集** 的五级流水 CPU SoC。当前工程已使用 Vivado 2023.2 完成仿真、综合、实现、bitstream 生成和 NEXYS4 DDR 上板串口验证；仓库根目录中的旧实验目录和课程资料仅作参考，当前有效工程入口是 `Verilog/`。
 
 ## 一、文档入口
 
@@ -91,5 +91,5 @@ PERF READY
 
 ## 五、当前完成状态
 
-当前 RTL、boot 程序、仿真脚本和综合脚本已经形成可独立构建的目录结构。已运行 `scripts/build_bupt_riscv.tcl` 并生成 `build/bupt_riscv_top.bit`，实现后时序满足约束。课程报告中还需要补充实物上板证据，例如串口输出截图、LED 点亮照片或视频、`perf` 命令输出和 CPI 计算。
+当前 RTL、boot 程序、仿真脚本和综合脚本已经形成可独立构建的目录结构。2026-07-09 clean-name rebuild 已运行 `scripts/build_bupt_riscv.tcl` 并生成 `build/bupt_riscv_top.bit`，实现后时序满足 100 MHz 约束；2026-07-08 `build19` 已记录 NEXYS4 DDR 上板串口验证和 benchmark/perf 输出。课程报告中建议整理串口输出截图、LED 点亮照片或视频、`perf` 命令输出和 CPI 计算。
 

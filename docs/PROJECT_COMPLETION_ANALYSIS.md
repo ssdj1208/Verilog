@@ -7,13 +7,13 @@
 当前状态：
 
 ```text
-行为级仿真：脚本已准备
-综合/实现/bitstream：Vivado 2023.2 已通过，已生成 build/bupt_riscv_top.bit
+行为级仿真：Vivado 2023.2 已通过
+综合/实现/bitstream：Vivado 2023.2 已通过，2026-07-09 clean-name rebuild 已生成 build/bupt_riscv_top.bit
 时序目标：满足 100 MHz
-实物上板证据：需要学生在 NEXYS4 DDR 上补充截图、照片或视频
+实物上板：2026-07-08 build19 已记录 NEXYS4 DDR 串口验证日志
 ```
 
-也就是说，RTL、工程脚本和 bitstream 构建已经基本完成。后续课程交付重点是收集上板验证证据，并在报告中补充波形、串口输出、PPA 分析和性能计数数据。
+也就是说，RTL、工程脚本、bitstream 构建和基础上板验证已经基本完成。后续课程交付重点是把现有串口日志、波形、PPA 分析和性能计数数据整理进报告。
 
 ## 2. 课程要求覆盖矩阵
 
@@ -29,9 +29,9 @@
 | 内存和 I/O 集成 | 已完成 | 集成 Boot ROM、BRAM、UART、GPIO、Timer、DDR Bridge、性能计数 MMIO。 |
 | 性能计数器 | 已完成 | 支持 cycle、retired instruction、branch、mispredict、stall 计数。 |
 | Vivado 仿真脚本 | 已完成 | `scripts/sim_bupt_riscv.tcl`。 |
-| Vivado 构建脚本 | 已完成 | `scripts/build_bupt_riscv.tcl`，已生成工程和 bitstream。 |
+| Vivado 构建脚本 | 已完成 | `scripts/build_bupt_riscv.tcl`，2026-07-09 clean-name rebuild 已生成工程和 bitstream。 |
 | NEXYS4 DDR 下载脚本 | 已完成 | `scripts/program_bupt_riscv.tcl`。 |
-| 实物硬件验证 | 待补证据 | 需要下载板卡后保存串口截图、LED 照片或视频。 |
+| 实物硬件验证 | 已完成基础验证 | 2026-07-08 build19 已记录串口日志；报告中仍建议补充截图、LED 照片或视频。 |
 
 ## 3. RV32I 指令完成度
 
@@ -103,13 +103,13 @@ src/bupt_riscv/dcache_2way_lru.v
 
 - 16 组。
 - 2 路组相联。
-- 每行 1 个 word。
+- 每行 4 个 word。
 - LRU victim 选择。
 - write-through 写策略。
 - 支持 accesses、hits、misses、replacements 统计。
 - MMIO 地址区域：`0x1000_6000`。
 
-这一部分可以作为课程拓展方向“Cache 替换策略优化与命中率分析”的支撑内容。报告中可以结合 `cache` shell 命令输出讨论命中率和替换次数。
+这一部分可以作为课程拓展方向“Cache 替换策略优化与命中率分析”的支撑内容。报告中可以结合 `bench mem`、Cache MMIO 统计和 `perf` 输出讨论命中率、refill 开销和替换次数；`cache` shell 命令用于重复运行 D-Cache/LRU 自测。
 
 ### 5.3 RV32M 乘除法扩展
 
@@ -172,18 +172,18 @@ FP TEST OK
 PERF READY
 ```
 
-当前 Vivado 2023.2 实现结果：
+当前 Vivado 2023.2 实现结果来自 2026-07-09 clean-name rebuild：
 
 | 指标 | 结果 |
 | --- | ---: |
-| WNS | 1.316 ns |
+| WNS | +0.080 ns |
 | TNS | 0.000 ns |
-| 主 100 MHz 时钟 WNS | 6.688 ns |
-| LUT | 14153 / 63400，22.32% |
-| Register | 12313 / 126800，9.71% |
-| BRAM Tile | 5 / 135，3.70% |
-| DSP | 14 / 240，5.83% |
-| 估计功耗 | 1.707 W |
+| SoC/CPU clock | 100.000 MHz |
+| LUT | 17229 / 63400，27.18% |
+| Register | 30329 / 126800，23.92% |
+| BRAM Tile | 9 / 135，6.67% |
+| DSP | 2 / 240，0.83% |
+| 估计功耗 | 1.171 W |
 
 结论：当前实现满足 100 MHz 时序，资源占用仍有较大余量。
 

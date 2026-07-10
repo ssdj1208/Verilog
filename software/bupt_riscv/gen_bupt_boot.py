@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-"""Generate the BUPT RV32I boot ROM image."""
+"""生成 BUPT RV32I SoC 的 Boot ROM 镜像。
+
+这个脚本不是普通的 PC 端测试程序，而是一个“极简汇编器 + ROM 生成器”。
+它用 Python 函数逐条拼出 RISC-V 机器码，生成
+src/bupt_riscv/bupt_riscv_boot.mem。硬件里的 boot_rom.v 会用 $readmemh
+把这个 mem 文件装入 FPGA Boot ROM。上板复位后，CPU 实际执行的就是
+这里生成的启动自检、UART shell、benchmark 和中断演示程序。
+"""
 from pathlib import Path
 
+# Boot ROM 深度，单位是 32-bit word。需要和 src/bupt_riscv/boot_rom.v 保持一致。
 BOOT_WORDS = 4096
 
+# SoC 的 MMIO 地址映射。这里的常量必须和 src/bupt_riscv/simple_bus.v 的
+# 地址译码一致，否则 boot 程序会访问到错误外设。
 GPIO_BASE = 0x10000000
 UART_BASE = 0x10001000
 TIMER_BASE = 0x10002000
@@ -15,14 +25,19 @@ FP_BASE = 0x10007000
 DEBUG_BASE = 0x10008000
 DDR_BASE = 0x80000000
 BRAM_BASE = 0x00010000
+
+# Boot 程序在 BRAM 中预留的工作区。CMD_BUF 保存串口命令行，
+# SNAP_BASE 保存 benchmark 结束瞬间的性能计数器快照。
 CMD_BUF = BRAM_BASE + 0x500
 SNAP_BASE = BRAM_BASE + 0x600
 SNAP_CACHE_MISSES = 0x30
 
+# UART MMIO 内部寄存器偏移。STATUS bit0 是 tx_ready，bit1 是 rx_valid。
 UART_TXDATA = 0x0
 UART_RXDATA = 0x4
 UART_STATUS = 0x8
 
+# RISC-V ABI 寄存器别名表，后面发射指令时可以直接写 "t0"、"a0"、"sp"。
 REG = {f"x{i}": i for i in range(32)}
 REG.update({
     "zero": 0, "ra": 1, "sp": 2, "gp": 3, "tp": 4,
@@ -33,6 +48,8 @@ REG.update({
     "t3": 28, "t4": 29, "t5": 30, "t6": 31,
 })
 
+# prog 是最终写入 ROM 的机器码数组；labels/fixups 实现“先占位、后回填”的
+# 标签解析；listing 用来生成 gen_bupt_boot.lst，便于对照地址和汇编。
 prog = []
 labels = {}
 fixups = []
@@ -40,19 +57,24 @@ listing = []
 
 
 def pc():
+    # 当前 ROM 写入地址，单位是 byte。RV32I/RV32M 指令固定 4 字节。
     return len(prog) * 4
 
 
 def label(name):
+    # 给当前位置打标签，供 branch/jal/la 等伪指令后续回填目标地址。
     labels[name] = pc()
     listing.append((None, None, f"{name}:"))
 
 
 def emit(word, asm):
+    # 追加一条 32-bit 机器码，并在 listing 中记录可读的汇编文本。
     prog.append(word & 0xFFFFFFFF)
     listing.append((pc() - 4, word & 0xFFFFFFFF, asm))
 
 
+# 下面六个函数分别编码 R/I/S/B/U/J 指令格式，只做 bit-field 拼接。
+# 具体的 add/lw/beq 等函数会调用它们，形成更易读的“汇编 DSL”。
 def r(funct7, rs2, rs1, funct3, rd, opcode=0x33):
     return ((funct7 & 0x7F) << 25) | (REG[rs2] << 20) | (REG[rs1] << 15) | ((funct3 & 7) << 12) | (REG[rd] << 7) | opcode
 
@@ -77,6 +99,7 @@ def jenc(imm, rd):
     return (((imm >> 20) & 1) << 31) | (((imm >> 1) & 0x3FF) << 21) | (((imm >> 11) & 1) << 20) | (((imm >> 12) & 0xFF) << 12) | (REG[rd] << 7) | 0x6F
 
 
+# RV32I/RV32M 常用指令包装。调用这些函数相当于向 Boot ROM 发射一条指令。
 def add(rd, rs1, rs2): emit(r(0, rs2, rs1, 0, rd), f"add {rd},{rs1},{rs2}")
 def sub(rd, rs1, rs2): emit(r(0x20, rs2, rs1, 0, rd), f"sub {rd},{rs1},{rs2}")
 def sll(rd, rs1, rs2): emit(r(0, rs2, rs1, 1, rd), f"sll {rd},{rs1},{rs2}")
@@ -125,6 +148,7 @@ def nop(): addi("zero", "zero", 0)
 
 
 def branch(name, rs1, rs2, target):
+    # 分支目标可能还没定义，所以先写入 0 占位，等所有 label 收集完再回填。
     funct3 = {"beq": 0, "bne": 1, "blt": 4, "bge": 5, "bltu": 6, "bgeu": 7}[name]
     fixups.append((len(prog), "branch", target, rs1, rs2, funct3))
     emit(0, f"{name} {rs1},{rs2},{target}")
@@ -139,6 +163,7 @@ def bgeu(rs1, rs2, target): branch("bgeu", rs1, rs2, target)
 
 
 def jal(rd, target):
+    # jal 的目标也走 fixup 机制，最后根据 label 计算相对偏移。
     fixups.append((len(prog), "jal", target, rd, None, None))
     emit(0, f"jal {rd},{target}")
 
@@ -148,7 +173,7 @@ def call(target): jal("ra", target)
 def ret(): jalr("zero", 0, "ra")
 
 
-# CSR addresses (machine mode)
+# Machine mode CSR 地址。这里只用最小的一组 CSR 来做 timer interrupt 演示。
 CSR_MSTATUS = 0x300
 CSR_MIE     = 0x304
 CSR_MTVEC   = 0x305
@@ -161,7 +186,9 @@ MIE_MEIE     = 1 << 11
 
 
 def _csr(csr, rs1, funct3, rd):
+    # CSR 指令编码，用于设置 mtvec/mie/mstatus，并在中断处理结束后 mret。
     return ((csr & 0xFFF) << 20) | (REG[rs1] << 15) | ((funct3 & 7) << 12) | (REG[rd] << 7) | 0x73
+
 
 def csrrw(rd, csr, rs1): emit(_csr(csr, rs1, 1, rd), f"csrrw {rd},{csr:#x},{rs1}")
 def csrrs(rd, csr, rs1): emit(_csr(csr, rs1, 2, rd), f"csrrs {rd},{csr:#x},{rs1}")
@@ -173,6 +200,8 @@ def mret(): emit(0x30200073, "mret")
 
 
 def li(rd, value):
+    # 伪指令 li：小常数直接 addi，较大常数拆成 lui + addi。
+    # lo 可能为负数，所以这里按 RISC-V 常见规则给 hi 先加 0x800 做修正。
     value &= 0xFFFFFFFF
     hi = (value + 0x800) >> 12
     lo = value - ((hi & 0xFFFFF) << 12)
@@ -185,6 +214,7 @@ def li(rd, value):
 
 
 def la(rd, target):
+    # 伪指令 la：生成两条占位指令，最后按 label 的绝对地址回填高 20 位和低 12 位。
     fixups.append((len(prog), "la_hi", target, rd, None, None))
     emit(0, f"lui {rd},%hi({target})")
     fixups.append((len(prog), "la_lo", target, rd, None, None))
@@ -192,28 +222,34 @@ def la(rd, target):
 
 
 def expect(reg, value, fail_label="isa_fail"):
+    # 自检断言：比较寄存器值和期望值，不相等就跳到失败处理标签。
     li("t6", value)
     bne(reg, "t6", fail_label)
 
 
 def puts_label(name):
+    # 输出字符串：先把字符串 label 地址放入 a0，再调用 ROM 中的 puts 子程序。
     la("a0", name)
     call("puts")
 
 
 def wait_fp_ready(label_name):
+    # FP MMIO 的 ready 寄存器在 FP_BASE+0x10。写入操作数和 op 后轮询到非零。
     label(label_name)
     lw("t2", 16, "t0")
     beq("t2", "zero", label_name)
 
 
 def print_perf_field(msg_label, offset):
+    # perf 命令打印一个性能字段：字段名 + PERF_BASE 对应偏移的 32-bit 十六进制值。
     puts_label(msg_label)
     li("t0", PERF_BASE)
     lw("a0", offset, "t0")
     call("print_hex")
 
 
+# 性能计数器输出字段。偏移含义对应 src/bupt_riscv/perf_mmio.v 的读寄存器表：
+# cycles、retired、branches、mispredicts、各类 stall 和 flush 计数。
 PERF_SNAPSHOT_FIELDS = [
     ("msg_cycles", 0),
     ("msg_retired", 4),
@@ -231,6 +267,8 @@ PERF_SNAPSHOT_FIELDS = [
 
 
 def snapshot_perf():
+    # benchmark 结束后先把性能计数器复制到 BRAM。
+    # 这样后续 UART 打印本身产生的指令退休和 stall 不会污染 benchmark 数据。
     li("t0", PERF_BASE)
     li("t1", SNAP_BASE)
     for _, offset in PERF_SNAPSHOT_FIELDS:
@@ -239,6 +277,7 @@ def snapshot_perf():
 
 
 def snapshot_cache_misses():
+    # bench mem 除性能计数外，还额外保存 D-Cache miss 计数。
     li("t0", CACHE_BASE)
     lw("t2", 8, "t0")
     li("t1", SNAP_BASE)
@@ -246,6 +285,7 @@ def snapshot_cache_misses():
 
 
 def print_snapshot_field(msg_label, offset):
+    # 从 BRAM 快照区打印一个 benchmark 字段。
     puts_label(msg_label)
     li("t0", SNAP_BASE)
     lw("a0", offset, "t0")
@@ -253,12 +293,15 @@ def print_snapshot_field(msg_label, offset):
 
 
 def print_snapshot_tail(skip_offsets=()):
+    # 打印快照中的其余字段；skip_offsets 用来避免重复打印 benchmark 的主指标。
     skip = set(skip_offsets)
     for msg_label, offset in PERF_SNAPSHOT_FIELDS:
         if offset not in skip:
             print_snapshot_field(msg_label, offset)
 
 
+# Boot ROM 入口。复位后 PC 从 0 取指，首先设置栈，然后依次运行启动自检。
+# 每个自检成功后会通过 UART 打印一行 PASS/OK/READY；失败则进入对应 fail 死循环。
 label("_start")
 li("sp", BRAM_BASE + 0x1000)
 puts_label("msg_banner")
@@ -273,6 +316,8 @@ puts_label("msg_perf_ready")
 call("print_prompt")
 j("shell_loop")
 
+# RV32I 基础指令自检。覆盖算术逻辑、移位、比较、load/store 字节半字扩展、
+# 分支跳转和 auipc/jalr。每一步都用 expect 检查结果。
 label("run_isa_tests")
 li("t0", 5)
 addi("t1", "t0", 7)
@@ -339,6 +384,7 @@ label("branch_ok3")
 bgeu("t1", "t0", "branch_ok4")
 j("isa_fail")
 label("branch_ok4")
+# 用 auipc + jalr 构造一次寄存器间接跳转；如果跳转失败会落到 isa_fail。
 auipc("t0", 0)
 addi("t0", "t0", 16)
 jalr("zero", 0, "t0")
@@ -346,6 +392,7 @@ j("isa_fail")
 addi("a0", "zero", 0)
 ret()
 
+# RV32M 乘除法扩展自检。覆盖乘法、无符号高位乘法、有符号/无符号除法和取余。
 label("run_m_tests")
 li("t0", 7)
 li("t1", 6)
@@ -375,6 +422,8 @@ remu("t2", "t0", "t1")
 expect("t2", 2)
 ret()
 
+# ISA/M 扩展自检失败处理。读取 CPU 暴露的分支调试寄存器并通过 UART 打印，
+# 方便定位是否是分支、比较或流水线 forwarding/stall 出问题。
 label("isa_fail")
 li("t0", DEBUG_BASE)
 lw("s2", 0, "t0")
@@ -397,6 +446,8 @@ call("print_hex")
 label("isa_fail_halt")
 j("isa_fail_halt")
 
+# DDR 自检：先等 MIG/DDR calibration done，再向 DDR 数据窗口写两个固定 pattern，
+# 读回比较。通过说明 DDR status、D-Cache/DDR path 和基本读写链路可用。
 label("ddr_test")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -423,6 +474,9 @@ label("ddr_fail")
 puts_label("msg_ddr_fail")
 j("ddr_fail")
 
+# D-Cache 自检：在 DDR 上预置三个 word，清空 D-Cache 统计后读三处地址。
+# 预期前三次读是 miss，最后重复读同一地址是 hit，因此统计应为 hit=1、
+# miss=3、replacement=0。数据和计数都正确才打印 CACHE READY。
 label("cache_test")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -459,6 +513,9 @@ label("cache_fail")
 puts_label("msg_cache_fail")
 j("cache_fail")
 
+# FP32 MMIO 协处理器自检。通过 MMIO 写入两个单精度正数和操作选择：
+# op=0 做加法 1.5 + 2.25 = 3.75，op=1 做乘法 1.5 * 2.0 = 3.0。
+# 结果按 IEEE754 bit pattern 比较。
 label("fp_test")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -490,6 +547,8 @@ label("fp_fail")
 puts_label("msg_fp_fail")
 j("fp_fail")
 
+# UART shell 主循环。命令解析为了节省 ROM 空间，只看命令第一个字符，
+# 部分命令再检查后续关键字符。例如 "perf clear" 和 "pc" 都能触发清零。
 label("shell_loop")
 call("getchar")
 addi("s0", "a0", 0)
@@ -526,11 +585,13 @@ li("t0", ord("t"))
 beq("s0", "t0", "cmd_intstat")
 j("cmd_help")
 
+# help：打印当前 ROM 支持的命令列表。
 label("cmd_help")
 puts_label("msg_help")
 call("print_prompt")
 j("shell_loop")
 
+# mem/cache/fp：手动重复运行启动阶段的 DDR、D-Cache、FP 自检。
 label("cmd_mem")
 call("ddr_test")
 call("print_prompt")
@@ -546,6 +607,7 @@ call("fp_test")
 call("print_prompt")
 j("shell_loop")
 
+# led：写 GPIO MMIO，点亮 LED0，用于确认 CPU 到 GPIO 的 MMIO 写链路和板上 LED。
 label("cmd_led")
 li("t0", GPIO_BASE)
 li("t1", 1)
@@ -554,6 +616,7 @@ puts_label("msg_ok")
 call("print_prompt")
 j("shell_loop")
 
+# run：执行一个很小的分支循环，主要用于产生可观察的分支/退休指令活动。
 label("cmd_run")
 li("t0", 64)
 label("run_loop")
@@ -563,6 +626,7 @@ puts_label("msg_demo")
 call("print_prompt")
 j("shell_loop")
 
+# perf：直接读取性能计数器 MMIO 并打印。输出值是十六进制。
 label("cmd_perf")
 print_perf_field("msg_cycles", 0)
 print_perf_field("msg_retired", 4)
@@ -579,6 +643,7 @@ print_perf_field("msg_flush_tr", 44)
 call("print_prompt")
 j("shell_loop")
 
+# perf 命令分派：如果命令中出现 clear 的关键字符，就转到性能计数器清零。
 label("cmd_perf_dispatch")
 li("t0", CMD_BUF + 1)
 lbu("t1", 0, "t0")
@@ -590,13 +655,7 @@ li("t2", ord("c"))
 beq("t1", "t2", "cmd_pclr")
 j("cmd_perf")
 
-label("cmd_cache_stats")
-puts_label("msg_cache_hits")
-li("t0", CACHE_BASE)
-lw("a0", 4, "t0")
-call("print_hex")
-j("shell_loop")
-
+# bench 命令分派：支持 bench alu / bench mem / bench branch，也保留 a/e/g 简写入口。
 label("cmd_bench_dispatch")
 li("t0", CMD_BUF + 1)
 lbu("t1", 0, "t0")
@@ -616,6 +675,7 @@ li("t2", ord("b"))
 beq("t1", "t2", "cmd_bbr")
 j("cmd_help")
 
+# perf clear：向 PERF_BASE+0x1c 写 1。perf_mmio.v 用这个写操作清零所有计数器。
 label("cmd_pclr")
 li("t0", PERF_BASE)
 li("t1", 1)
@@ -624,6 +684,8 @@ puts_label("msg_ok")
 call("print_prompt")
 j("shell_loop")
 
+# bench alu：清零性能计数器后运行 1000 轮算术/逻辑/乘法混合循环，
+# 结束后先快照再打印，用于观察 ALU/M 扩展和流水线基础性能。
 label("cmd_balu")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -650,6 +712,8 @@ addi("sp", "sp", 4)
 call("print_prompt")
 j("shell_loop")
 
+# bench mem：清零 perf 和 D-Cache 统计，顺序写 256 个 word 到 DDR，再顺序读回。
+# 输出 cycles/stalls/misses 等，用于观察 DDR 和 D-Cache 行为。
 label("cmd_bmem")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -685,6 +749,8 @@ addi("sp", "sp", 4)
 call("print_prompt")
 j("shell_loop")
 
+# bench branch：运行大量固定模式分支，重点打印分支数和误预测数，
+# 用于观察 branch predictor 和 flush 相关计数。
 label("cmd_bbr")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -715,6 +781,8 @@ addi("sp", "sp", 4)
 call("print_prompt")
 j("shell_loop")
 
+# int on：设置 mtvec，打开 machine external interrupt，启动 timer。
+# 中断处理函数会增加 tick 计数并翻转 LED1。
 label("cmd_inton")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -735,6 +803,7 @@ addi("sp", "sp", 4)
 call("print_prompt")
 j("shell_loop")
 
+# int 命令分派：int 默认等同 int on；int stat 打印 tick/pending；int off 关中断。
 label("cmd_int_dispatch")
 li("t0", CMD_BUF + 1)
 lbu("t1", 0, "t0")
@@ -754,6 +823,7 @@ li("t2", ord("f"))
 beq("t1", "t2", "cmd_intoff")
 j("cmd_inton")
 
+# int off：清除 mstatus.MIE，停止 CPU 响应中断。
 label("cmd_intoff")
 li("t0", MSTATUS_MIE)
 csrrc("zero", CSR_MSTATUS, "t0")
@@ -761,6 +831,7 @@ puts_label("msg_int_off")
 call("print_prompt")
 j("shell_loop")
 
+# int stat：打印 BRAM 中的 tick 计数和 IRQ pending 状态，验证 timer/IRQ 链路。
 label("cmd_intstat")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -777,6 +848,8 @@ addi("sp", "sp", 4)
 call("print_prompt")
 j("shell_loop")
 
+# Timer 中断处理函数。为了保持 ISR 短小，只保存会用到的临时寄存器：
+# 1) BRAM tick 计数 +1；2) 翻转 LED1；3) 写 timer ack 清中断；4) mret 返回。
 label("irq_handler")
 addi("sp", "sp", -16)
 sw("t0", 0, "sp")
@@ -800,6 +873,7 @@ lw("t2", 8, "sp")
 addi("sp", "sp", 16)
 mret()
 
+# 打印 shell 提示符 rv32>。
 label("print_prompt")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -808,6 +882,7 @@ lw("ra", 0, "sp")
 addi("sp", "sp", 4)
 ret()
 
+# puts(a0)：从 a0 指向的 NUL 结尾字符串逐字节输出到 UART。
 label("puts")
 addi("sp", "sp", -8)
 sw("ra", 4, "sp")
@@ -825,6 +900,7 @@ lw("ra", 4, "sp")
 addi("sp", "sp", 8)
 ret()
 
+# putchar(a0)：阻塞式 UART 发送。先轮询 STATUS.tx_ready，再写 TXDATA。
 label("putchar")
 li("t0", UART_BASE)
 label("putchar_wait")
@@ -834,6 +910,7 @@ beq("t1", "zero", "putchar_wait")
 sw("a0", UART_TXDATA, "t0")
 ret()
 
+# getchar() -> a0：阻塞式 UART 接收。先轮询 STATUS.rx_valid，再读 RXDATA。
 label("getchar")
 li("t0", UART_BASE)
 label("getchar_wait")
@@ -844,6 +921,8 @@ lw("a0", UART_RXDATA, "t0")
 andi("a0", "a0", 0xFF)
 ret()
 
+# consume_line：shell 已经读到首字符 s0，这里继续读到 CR/LF，
+# 同时把整行存入 CMD_BUF，供 perf clear / bench xxx / int stat 这类命令二次判断。
 label("consume_line")
 addi("sp", "sp", -4)
 sw("ra", 0, "sp")
@@ -877,6 +956,7 @@ lw("ra", 0, "sp")
 addi("sp", "sp", 4)
 ret()
 
+# print_hex(a0)：把 32-bit 值打印成 8 个大写十六进制字符，并追加 CRLF。
 label("print_hex")
 addi("sp", "sp", -12)
 sw("ra", 8, "sp")
@@ -910,6 +990,8 @@ ret()
 
 
 def bytes_label(name, text):
+    # 把 Python 字符串按小端 32-bit word 填入 ROM，并给这段字符串打 label。
+    # 程序中的 puts_label 会通过 la 找到这些字符串的 ROM 地址。
     while len(prog) * 4 % 4:
         emit(0, "pad")
     labels[name] = len(prog) * 4
@@ -923,6 +1005,7 @@ def bytes_label(name, text):
         emit(word, f'.ascii "{display_text}"')
 
 
+# 串口输出文本常量。启动日志和 shell 命令输出都来自这里。
 bytes_label("msg_banner", "BUPT RISC-V CPU PROJECT\r\n")
 bytes_label("msg_isa_pass", "RV32I ISA PASS\r\n")
 bytes_label("msg_m_pass", "M EXT PASS\r\n")
@@ -950,7 +1033,6 @@ bytes_label("msg_stall_if", "stall_if=")
 bytes_label("msg_stall_ddr", "stall_ddr=")
 bytes_label("msg_flush_br", "flush_br=")
 bytes_label("msg_flush_tr", "flush_tr=")
-bytes_label("msg_cache_hits", "cache_hits=")
 bytes_label("msg_balu", "BALU cycles=")
 bytes_label("msg_bmem", "BMEM cycles=")
 bytes_label("msg_bbr", "BBR branches=")
@@ -964,6 +1046,8 @@ bytes_label("msg_dbg_srca", "branch_srca=")
 bytes_label("msg_dbg_srcb", "branch_srcb=")
 bytes_label("msg_dbg_info", "branch_info=")
 
+# 第二遍解析：此时所有代码和字符串 label 都已经确定，可以回填 branch/jal/la。
+# 注意 listing 里仍保留原始伪汇编文本，真正写入 mem/listing 的机器码从 prog 取。
 for index, kind, target, a, b, funct3 in fixups:
     here = index * 4
     dest = labels[target]
@@ -984,9 +1068,13 @@ for index, kind, target, a, b, funct3 in fixups:
 if len(prog) > BOOT_WORDS:
     raise SystemExit(f"boot image too large: {len(prog)} words")
 
+# ROM 固定 4096 word；未使用空间补 0，保证 boot_rom.v 读入文件长度稳定。
 while len(prog) < BOOT_WORDS:
     prog.append(0)
 
+# 输出两个文件：
+# 1) bupt_riscv_boot.mem 给硬件 Boot ROM 使用。
+# 2) gen_bupt_boot.lst 给人看，便于把 ROM 地址、机器码和伪汇编对应起来。
 repo = Path(__file__).resolve().parents[2]
 mem_path = repo / "src" / "bupt_riscv" / "bupt_riscv_boot.mem"
 lst_path = repo / "software" / "bupt_riscv" / "gen_bupt_boot.lst"

@@ -22,9 +22,9 @@ if {[llength $soc_files] == 0} {
 
 create_project bupt_riscv $proj_dir -part xc7a100tcsg324-1 -force
 
-create_ip -name mig_7series -vendor xilinx.com -library ip -version 4.2 -module_name lab10_mig
-set_property -dict [list CONFIG.XML_INPUT_FILE [file join $repo_dir src bupt_riscv mig nexys4ddr_mig.prj]] [get_ips lab10_mig]
-generate_target all [get_ips lab10_mig]
+create_ip -name mig_7series -vendor xilinx.com -library ip -version 4.2 -module_name bupt_riscv_mig
+set_property -dict [list CONFIG.XML_INPUT_FILE [file join $repo_dir src bupt_riscv mig nexys4ddr_mig.prj]] [get_ips bupt_riscv_mig]
+generate_target all [get_ips bupt_riscv_mig]
 
 add_files $common_files
 add_files $core_files

@@ -1,9 +1,9 @@
 # BUPT 项目式课程阶段二题目 B 符合性审查
 
-审查对象：`step_into_mips` 中新增的 `bupt_riscv` 独立工程  
-审查日期：2026-07-06  
+审查对象：`Verilog` 目录中的 `bupt_riscv` 独立工程  
+审查日期：2026-07-09  
 目标平台：NEXYS4 DDR，Vivado 2023.2  
-当前结论：工程主体已经满足题目 B 的基础要求、进阶要求，并补齐流水线冒险、Cache 替换策略、乘除法扩展和浮点协处理器等拓展方向；Vivado 行为级仿真、综合、实现和 bitstream 生成已通过，仍需要补充实物上板验收记录。
+当前结论：工程主体已经满足题目 B 的基础要求、进阶要求，并补齐流水线冒险、Cache 替换策略、乘除法扩展和浮点协处理器等拓展方向；Vivado 行为级仿真、综合、实现、bitstream 生成和 NEXYS4 DDR 上板串口验证均已通过。
 
 ## 1. 课程要求来源
 
@@ -25,8 +25,8 @@
 | 控制冒险处理 | 已满足 | 64 项 BTB/BHT 分支预测，EX 阶段解析并 flush 错误路径。 |
 | 内存与 I/O 系统 | 已满足 | Boot ROM、BRAM、DDR bridge、UART、GPIO、Timer、Perf MMIO 已集成。 |
 | 仿真验证 | 已满足 | Vivado 2023.2 行为级仿真通过。 |
-| 综合/实现/bitstream | 已满足 | Vivado 2023.2 已生成 `build/bupt_riscv_top.bit`，时序满足 100 MHz。 |
-| 实物硬件验证 | 待补证据 | 需要你在 NEXYS4 DDR 上下载 bit，并保存串口输出和 LED 照片/视频。 |
+| 综合/实现/bitstream | 已满足 | Vivado 2023.2 clean-name rebuild 已生成 `build/bupt_riscv_top.bit`，时序满足 100 MHz。 |
+| 实物硬件验证 | 已完成基础验证 | 2026-07-08 build19 已记录 NEXYS4 DDR 串口日志；报告中建议补充截图、LED 照片或视频。 |
 | CPI/吞吐量/PPA 报告 | 部分满足 | 硬件计数器已支持，文档中仍需补实验数据和分析表。 |
 | Cache 替换策略/乘除法/浮点 | 已满足 | 已新增 2 路 LRU D-Cache、RV32M 乘除法指令和 FP32 MMIO 协处理器，并通过 boot/testbench 验证。 |
 
@@ -124,7 +124,7 @@
 
 证据：
 
-- 新增 `src/bupt_riscv/dcache_2way_lru.v`，实现 16 组 2 路组相联 D-Cache，1 word cache line，write-through 写策略，LRU victim 选择。
+- 新增 `src/bupt_riscv/dcache_2way_lru.v`，实现 16 组 2 路组相联 D-Cache，4-word cache line，write-through 写策略，LRU victim 选择。
 - Cache 位于 DDR 通路前，只缓存 `0x8000_0000` DDR 区域，不影响 boot ROM、BRAM、UART、GPIO 等本地 MMIO。
 - 新增 Cache MMIO 地址 `0x1000_6000`，可读取 accesses、hits、misses、replacements、结构信息和替换策略；写 `0x1000_601c` 可清统计并 invalidate cache line。
 - boot 自测 `cache_test` 会构造同组 3 个地址，验证 2 路填充、第三个地址触发 LRU replacement，并检查 hit/miss/replacement 计数。
@@ -185,11 +185,11 @@ BUPT_RISCV_SIM_DONE
 
 - 构建脚本面向 `xc7a100tcsg324-1`，即 NEXYS4 DDR 所用 Artix-7 器件，见 `scripts/build_bupt_riscv.tcl:6`。
 - 构建脚本加载 `nexys4ddr_bupt_riscv.xdc` 并执行到 `write_bitstream`，见 `scripts/build_bupt_riscv.tcl:20` 和 `scripts/build_bupt_riscv.tcl:30`。
-- 已于 2026-07-07 10:22 完成实现和 bitstream 生成，当前目录存在最终 bit 文件：`build/bupt_riscv_top.bit`。
+- 已于 2026-07-09 16:05 完成 clean-name rebuild 实现和 bitstream 生成，当前目录存在最终 bit 文件：`build/bupt_riscv_top.bit`。
 - Vivado 成功日志显示 `Bitgen Completed Successfully`，并输出 `BUPT_RISCV_BITSTREAM=D:/CodeProject/Verilog_Project/COCP/Verilog/build/bupt_riscv_top.bit`。
-- 时序满足 100 MHz：全设计 WNS = 1.316 ns，TNS = 0.000 ns；主 `sys_clk_pin` 时钟域 WNS = 6.446 ns。
-- 资源占用：Slice LUTs 14153/63400（22.32%），Slice Registers 12313/126800（9.71%），Block RAM Tile 5/135（3.70%），DSP 14/240（5.83%）。
-- 功耗估计：Total On-Chip Power 1.707 W，Dynamic Power 1.597 W，Device Static Power 0.110 W。
+- 时序满足 100 MHz：clean-name rebuild routed WNS = +0.080 ns，TNS = 0.000 ns；SoC/CPU clock = 100.000 MHz。
+- 资源占用：Slice LUTs 17229/63400（27.18%），Slice Registers 30329/126800（23.92%），Block RAM Tile 9/135（6.67%），DSP 2/240（0.83%）。
+- 功耗估计：Total On-Chip Power 1.171 W，Dynamic Power 1.063 W，Device Static Power 0.108 W。
 - 精简构建摘要见 `docs/bupt_riscv_build_summary.md`。
 
 建议补证据：
@@ -199,14 +199,14 @@ BUPT_RISCV_SIM_DONE
 
 ### 6.3 实物上板
 
-状态：待你实际验收。
+状态：已完成基础上板验收，报告中建议整理截图和照片。
 
 下载脚本已经准备好：
 
 - `scripts/program_bupt_riscv.tcl` 会打开硬件管理器、连接目标设备并下载 bit，见 `scripts/program_bupt_riscv.tcl:9`、`scripts/program_bupt_riscv.tcl:16`、`scripts/program_bupt_riscv.tcl:31`。
 - 成功后会打印 `BUPT_RISCV_PROGRAMMED=... BITSTREAM=...`，见 `scripts/program_bupt_riscv.tcl:46`。
 
-还需要你完成：
+已记录的验收步骤：
 
 1. 用 USB 连接 NEXYS4 DDR。
 2. 运行下载命令。
@@ -255,8 +255,8 @@ rv32>
 
 高优先级：
 
-1. 补实物上板证据。没有板级串口和 LED 证据时，“硬件验证”只能算代码和 bitstream 准备完成，不能算完全闭环。
-2. 补实测 CPI/吞吐量截图。当前硬件和 shell 已支持 `perf`，报告中需要贴一次上板或仿真输出并计算 CPI。
+1. 整理实物上板证据。已有串口日志，报告中建议补充截图和 LED 照片或视频。
+2. 整理实测 CPI/吞吐量截图。当前硬件和 shell 已支持 `perf` 与 `bench`，报告中需要贴一次上板输出并计算 CPI。
 3. 保存 Vivado 报告。包括 utilization、timing summary、综合实现成功截图。
 
 中优先级：
@@ -269,4 +269,4 @@ rv32>
 
 从代码实现和 Vivado 行为级仿真看，当前工程已经具备题目 B 要求的 CPU、RV32I 子集、五级流水线、内存与 I/O、DDR 测试、UART shell、性能计数器、流水线冒险优化、Cache LRU 替换、RV32M 乘除法和 FP32 浮点协处理器。  
 
-严格按课程验收口径，当前仍缺 NEXYS4 DDR 实物运行记录；性能/PPA 的基础数据已经在 `docs/bupt_riscv_build_summary.md` 中补齐，报告中再贴串口 `perf` 输出并计算 CPI 即可。
+严格按课程验收口径，当前已经具备 NEXYS4 DDR 实物串口运行记录；性能/PPA 的基础数据已经在 `docs/CPU_OPTIMIZATION_ROADMAP.md` 和 `docs/bupt_riscv_build_summary.md` 中补齐，报告中再贴串口 `perf`/`bench` 输出并计算 CPI 即可。

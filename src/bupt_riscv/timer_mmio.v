@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 
 module timer_mmio #(
-    parameter DEFAULT_COMPARE = 32'd50000000
+    parameter DEFAULT_COMPARE = 32'd1000000 // ~10 ms at 100 MHz
 )(
     input wire clk,
     input wire rst,

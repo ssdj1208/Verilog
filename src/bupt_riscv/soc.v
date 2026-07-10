@@ -2,7 +2,7 @@
 
 module soc #(
     parameter UART_CLKS_PER_BIT = 868,
-    parameter TIMER_TICK_CYCLES = 32'd50000000
+    parameter TIMER_TICK_CYCLES = 32'd1000000 // ~10 ms at 100 MHz
 )(
     input wire clk,
     input wire bus_clk,
