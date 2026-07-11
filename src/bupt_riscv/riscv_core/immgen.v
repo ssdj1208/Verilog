@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// RISC-V 立即数生成器。
+// 根据指令编码中的 opcode 选择 I/S/B/U/J 型立即数字段，并完成符号扩展。
 module immgen(
     input wire[31:0] instr,
     output reg[31:0] imm
@@ -7,6 +9,7 @@ module immgen(
 
     wire[6:0] opcode = instr[6:0];
 
+    // 立即数生成是纯组合逻辑；未识别格式输出 0，避免产生锁存器。
     always @(*) begin
         case (opcode)
             7'b0000011,

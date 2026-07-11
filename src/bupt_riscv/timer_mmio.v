@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 定时器 MMIO 外设。
+// counter 在 enable 时递增，到达 compare 后置位 pending，并可通过 irq_enable 输出 IRQ。
 module timer_mmio #(
     parameter DEFAULT_COMPARE = 32'd1000000 // ~10 ms at 100 MHz
 )(
@@ -25,6 +27,7 @@ module timer_mmio #(
 
     assign irq = pending & irq_enable;
 
+    // 定时计数、比较值、控制位和 pending 状态均在本时钟域更新。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             counter <= 32'b0;
@@ -67,6 +70,7 @@ module timer_mmio #(
         end
     end
 
+    // 组合读回当前计数值、比较值、控制位和 pending 状态。
     always @(*) begin
         case (addr[3:2])
             2'b00: rdata = counter;

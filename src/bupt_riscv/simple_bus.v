@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// SoC 简单地址总线和外设互连。
+// 取指访问连接 boot ROM/I-cache，数据访问按地址选择 RAM、MMIO 或 DDR cache；
+// 本地设备使用单周期握手，DDR 设备允许 d_ready 长时间保持为 0。
 module simple_bus #(
     parameter UART_CLKS_PER_BIT = 868,
     parameter TIMER_TICK_CYCLES = 32'd1000000 // ~10 ms at 100 MHz
@@ -62,6 +65,8 @@ module simple_bus #(
     input wire[31:0] debug_branch_info
     );
 
+    // 地址空间：低地址为启动 ROM，0x0001_xxxx 为片上 RAM，
+    // 0x1000_xxxx 为 MMIO，0x8000_0000 以上区域进入 DDR 数据缓存。
     wire boot_sel_i = (i_addr[31:14] == 18'h00000);
     wire boot_sel_d = (d_addr[31:14] == 18'h00000);
     wire ram_sel_d  = (d_addr[31:16] == 16'h0001);
@@ -99,6 +104,7 @@ module simple_bus #(
     wire[31:0] icache_misses;
     wire[31:0] icache_refill_cycles;
     reg d_local_ready;
+    // d_local_ready 只对本地请求产生一次完成脉冲；DDR 请求由 cache_ready 独立完成。
     wire d_local_access = d_valid & ~ddr_sel_d;
     wire d_local_fire = d_local_access & ~d_local_ready;
     wire d_we_local = d_local_fire & d_we;
@@ -123,6 +129,7 @@ module simple_bus #(
     wire[31:0] fp_rdata;
     wire timer_irq;
 
+    // 指令路径：I-cache 未命中时通过 be_addr 访问同步启动 ROM。
     boot_rom iboot(
         .clk(clk),
         .a(icache_be_addr[13:2]),
@@ -150,6 +157,7 @@ module simple_bus #(
         .spo(boot_d_rdata)
         );
 
+    // 本地数据访问的单次应答状态，避免 CPU 在请求保持期间重复写设备。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             d_local_ready <= 1'b0;
@@ -216,6 +224,7 @@ module simple_bus #(
         .irq_lines(irq_lines)
         );
 
+    // 性能计数器使用 perf_clk 采样 CPU 事件，地址请求仍来自本地总线。
     perf_mmio perf(
         .clk(perf_clk),
         .rst(rst),
@@ -292,6 +301,7 @@ module simple_bus #(
         endcase
     end
 
+    // DDR 数据路径：CPU -> D-cache -> ddr_bridge -> 外部后端。
     dcache_2way_lru dcache(
         .clk(clk),
         .rst(rst),
@@ -342,6 +352,7 @@ module simple_bus #(
         );
 
 
+    // 未映射的取指地址返回 0 并立即就绪，避免系统因坏地址永久停止。
     assign i_rdata = boot_sel_i ? icache_rdata : 32'b0;
     assign i_ready = boot_sel_i ? icache_ready : 1'b1;
 
@@ -350,6 +361,7 @@ module simple_bus #(
     assign d_ready = ~d_valid ? 1'b1 :
                      ddr_sel_d ? cache_ready : d_local_ready;
 
+    // 数据读返回多路选择：优先按地址区域选择对应外设的返回值。
     assign d_rdata = boot_sel_d       ? boot_d_rdata :
                      ram_sel_d        ? ram_rdata :
                      gpio_sel_d       ? gpio_rdata :

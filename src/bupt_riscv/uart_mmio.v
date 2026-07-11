@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// UART MMIO 包装器。
+// 将 CPU 总线读写转换为 UART 收发器接口，并提供发送就绪和接收有效状态。
 module uart_mmio #(
     parameter CLKS_PER_BIT = 868
 )(
@@ -46,6 +48,7 @@ module uart_mmio #(
     assign tx_ready = ~tx_busy;
     assign rx_valid = rx_valid_reg;
 
+    // 发送写入只在 UART 空闲时接受；收到字节后锁存，读取接收寄存器清除 valid。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             tx_start <= 1'b0;
@@ -71,6 +74,7 @@ module uart_mmio #(
         end
     end
 
+    // 按寄存器偏移返回发送数据、最近接收数据或状态位。
     always @(*) begin
         case (addr[3:2])
             2'b00: rdata = {24'b0, tx_data};

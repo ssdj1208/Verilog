@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// SoC 集成模块。
+// 连接 RV32 CPU、取指/数据缓存、片上 RAM、MMIO 外设、性能统计和 DDR bridge，
+// 并导出流水线演示及调试所需的观测信号。
 module soc #(
     parameter UART_CLKS_PER_BIT = 868,
     parameter TIMER_TICK_CYCLES = 32'd1000000 // ~10 ms at 100 MHz
@@ -59,6 +62,7 @@ module soc #(
     output wire demo_flush_trap
     );
 
+    // CPU 与总线之间的取指、数据访存和中断信号。
     wire[31:0] pc;
     wire[31:0] instr;
     wire i_ready;
@@ -113,6 +117,8 @@ module soc #(
         (demo_opcodeD == 7'b0110011) || // OP
         (demo_opcodeD == 7'b0100011) || // STORE
         (demo_opcodeD == 7'b1100011);   // BRANCH
+    // 根据演示面板看到的相邻指令重新识别 load-use 依赖，
+    // 用于在事件脉冲结束后保留几拍可见的演示状态。
     wire demo_loaduse_dependency =
         demo_validD && demo_validE &&
         (demo_opcodeE == 7'b0000011) &&
@@ -121,6 +127,7 @@ module soc #(
          (demo_uses_rs2D && (demo_instrD[24:20] == demo_load_rdE)));
     wire demo_loaduse_event = perf_stall_loaduse | demo_loaduse_dependency;
 
+    // 五级流水线 CPU：clk 为核心时钟，访存 ready 允许慢速 DDR 拉长 M 阶段。
     riscv cpu(
         .clk(clk),
         .rst(rst),
@@ -169,6 +176,7 @@ module soc #(
         .debug_branch_info(debug_branch_info)
         );
 
+    // 统一地址总线：本地设备在固定周期内应答，DDR 区域通过 cache/bridge 异步延长。
     simple_bus #(
         .UART_CLKS_PER_BIT(UART_CLKS_PER_BIT),
         .TIMER_TICK_CYCLES(TIMER_TICK_CYCLES)
@@ -230,6 +238,7 @@ module soc #(
     assign debug_dataadr = dataadr;
     assign debug_memwrite = memwrite;
 
+    // 演示事件历史寄存器：将短脉冲扩展为面板可观察的状态。
     always @(posedge clk) begin
         if (rst) begin
             demo_loaduse_history_r <= 4'b0;

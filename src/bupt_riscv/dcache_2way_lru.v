@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 两路组相联数据缓存，采用每组一位 LRU 替换信息。
+// 16 组、每行 4 个字、写直达策略；读未命中时整行 refill，写请求同时向后端提交。
 module dcache_2way_lru(
     input wire clk,
     input wire rst,
@@ -43,7 +45,8 @@ module dcache_2way_lru(
     reg[23:0] tag1[0:SETS-1];
     reg[31:0] data0[0:SETS-1][0:LINE_WORDS-1];
     reg[31:0] data1[0:SETS-1][0:LINE_WORDS-1];
-    reg lru[0:SETS-1]; // 0 replaces way0, 1 replaces way1
+    // lru=0 表示下一次优先替换 way0，lru=1 表示优先替换 way1。
+    reg lru[0:SETS-1];
 
     reg[2:0] state;
     reg ready_r;
@@ -70,6 +73,7 @@ module dcache_2way_lru(
     assign cpu_ready = ready_r;
     assign cpu_rdata = rdata_r;
 
+    // 按字节写选通合并缓存旧字与新字，支持 SB/SH/SW 等部分写入。
     function [31:0] merge_word;
         input [31:0] old_word;
         input [31:0] new_word;
@@ -84,6 +88,7 @@ module dcache_2way_lru(
 
     integer i;
     integer w;
+    // 主状态机：空闲查找、写等待、refill 发起、refill 等待和完成应答。
     always @(posedge clk) begin
         if (rst) begin
             state <= S_IDLE;

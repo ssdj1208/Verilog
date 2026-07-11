@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// UART 发送器，采用 8 位数据、1 个起始位、1 个停止位、无奇偶校验格式。
+// tx_start 在空闲时接受一个字节，tx_busy 表示当前帧尚未发送完成。
 module uart_tx #(
     parameter CLKS_PER_BIT = 868
 )(
@@ -21,6 +23,7 @@ module uart_tx #(
     reg[2:0] bit_index;
     reg[7:0] data;
 
+    // 状态机依次发送起始位、8 个数据位和停止位，每个位持续 CLKS_PER_BIT 个时钟。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= S_IDLE;

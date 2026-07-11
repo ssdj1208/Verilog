@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// Nexys4 DDR 板级顶层。
+// 负责按键/开关、时钟生成、SoC 复位、流水线演示显示、UART 和 DDR2 MIG 的连接。
 module top(
     input wire clk100mhz,
     input wire[4:0] btn,
@@ -27,6 +29,7 @@ module top(
     output wire[0:0] ddr2_odt
     );
 
+    // 板载按键索引：上/左/中/右/下分别用于运行、单步、复位、页面和速度控制。
     localparam BTN_U = 0;
     localparam BTN_L = 1;
     localparam BTN_C = 2;
@@ -35,6 +38,7 @@ module top(
 
     wire rst_btn = btn[BTN_C];
 
+    // 上电复位计数器：配置完成后暂时保持 MIG 复位，确保校准从确定状态开始。
     // Hold MIG in reset for a short time after FPGA configuration. This keeps
     // the board-level reset behavior deterministic before DDR calibration starts.
     reg[19:0] por_count = 20'd0;
@@ -63,6 +67,7 @@ module top(
     wire soc_clk_100mhz;
     wire clkgen_locked;
 
+    // 时钟 IP 输出 SoC 时钟和 MIG 参考时钟，并提供锁定状态。
     clock_gen clkgen(
         .clk100(clk100mhz),
         .rst(rst_btn),
@@ -80,6 +85,7 @@ module top(
     wire speed_btn_level;
     wire speed_btn_pulse;
 
+    // 四个用户按键先消抖并转换为本地时钟域的单周期按下脉冲。
     button_edge run_btn(
         .clk(soc_clk_100mhz),
         .rst(por_rst),
@@ -172,6 +178,7 @@ module top(
     wire demo_run_active;
     wire demo_speed_sel;
 
+    // 演示模式下由控制器生成 CPU 节拍；普通模式下保持正常连续运行。
     demo_clock_ctrl demo_clk_ctrl(
         .clk_i(soc_clk_100mhz),
         .rst_i(por_rst),
@@ -186,6 +193,7 @@ module top(
 
     assign bus_clk = soc_clk;
 
+    // SoC 复位同步释放：por_rst 解除后连续移入 0，避免异步释放造成亚稳态。
     always @(posedge soc_clk or posedge por_rst) begin
         if (por_rst) begin
             rst_sync <= 4'hf;
@@ -260,6 +268,7 @@ module top(
     wire demo_flush_branch;
     wire demo_flush_trap;
 
+    // SoC 核心及外设互连。
     soc #(
         .UART_CLKS_PER_BIT(868),
         .TIMER_TICK_CYCLES(32'd1000000)
@@ -317,6 +326,7 @@ module top(
         .demo_flush_trap(demo_flush_trap)
         );
 
+    // 流水线演示显示与验收显示共用板级 LED/数码管输出，根据模式选择一路。
     pipeline_demo_panel demo_panel(
         .clk(soc_clk_100mhz),
         .rst(por_rst),
@@ -375,6 +385,7 @@ module top(
     assign dp = demo_mode_latched ? demo_dp :
                 acceptance_active ? acceptance_dp : 1'b1;
 
+    // bus_clk 与 MIG UI 时钟之间的单请求 toggle CDC 边界。
     ddr_backend_cdc ddr_cdc(
         .bus_clk(bus_clk),
         .bus_rst(soc_rst),
@@ -402,6 +413,7 @@ module top(
         .axi_busy(axi_backend_busy)
         );
 
+    // 将 32 位后端请求转换为 MIG 所需的 AXI4 单 beat 读写事务。
     mig_axi_adapter ddr_axi(
         .clk(backend_clk),
         .rst(ui_clk_sync_rst),
@@ -454,6 +466,7 @@ module top(
         .s_axi_rready(s_axi_rready)
         );
 
+    // Vivado 生成的 DDR2 MIG IP：提供 UI 时钟、校准完成信号和 AXI 从接口。
     bupt_riscv_mig u_bupt_riscv_mig(
         .ddr2_addr(ddr2_addr),
         .ddr2_ba(ddr2_ba),

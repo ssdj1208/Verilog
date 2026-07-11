@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// DDR 后端总线的跨时钟域适配器。
+// bus_clk 域使用 toggle 事件传递请求，axi_clk 域完成请求握手并返回响应 toggle；
+// 多位地址/数据在单 outstanding 请求约束下保持稳定，控制事件通过两级同步器跨域。
 module ddr_backend_cdc(
     input wire bus_clk,
     input wire bus_rst,
@@ -53,6 +56,7 @@ module ddr_backend_cdc(
     assign bus_ready = bus_calib_done & ~bus_inflight;
     assign bus_busy = ~bus_calib_done | bus_inflight | axi_busy_bus_sync[1];
 
+    // bus_clk 域：锁存请求、等待响应 toggle，并同步校准完成和忙状态。
     always @(posedge bus_clk) begin
         if (bus_rst) begin
             bus_req_toggle <= 1'b0;
@@ -93,6 +97,7 @@ module ddr_backend_cdc(
         end
     end
 
+    // axi_clk 域：检测请求 toggle，向 MIG 侧发起事务并锁存返回数据。
     always @(posedge axi_clk) begin
         if (axi_rst) begin
             req_toggle_axi_meta <= 1'b0;

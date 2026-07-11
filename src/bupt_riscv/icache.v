@@ -1,6 +1,8 @@
 `timescale 1ns / 1ps
 
-// Direct-mapped instruction cache.
+// 直接映射指令缓存。
+// 每行包含 4 个 32 位字，共 64 行，容量为 1 KB；只读且未实现 dirty 位。
+// 命中时立即允许取指，未命中时由内部状态机从 boot ROM 整行 refill。
 //   - 64 sets, 4-word lines, 1 KB total.
 //   - index = pc[9:4], tag = pc[31:10], word = pc[3:2].
 //   - Read-only (no dirty bit). Miss refills a whole line from the backend.
@@ -17,12 +19,12 @@ module icache #(
     input wire rst,
     input wire invalidate,     // flush all entries (e.g. on stats clear)
 
-    // CPU fetch side
+    // CPU 取指侧：cpu_ready=1 表示当前地址命中且可继续推进 PC。
     input  wire [31:0] cpu_addr,
     output wire [31:0] cpu_rdata,
     output wire        cpu_ready,
 
-    // Backend (boot_rom) side
+    // 后端存储侧：be_addr 发起同步 ROM 读取，be_rdata 在后续周期返回。
     output reg  [31:0] be_addr,
     input  wire [31:0] be_rdata,
 
@@ -36,7 +38,7 @@ module icache #(
     localparam WORD_W = 2;   // log2(4 words/line)
     localparam TAG_W  = 22;
 
-    // Byte address layout for a 1 KB cache (64 lines x 4 words x 4 bytes):
+    // 1 KB 缓存的字节地址划分（64 行×每行 4 字×每字 4 字节）：
     //   [1:0] byte-in-word  [3:2] word-in-line  [9:4] line index  [31:10] tag
     wire [IDX_W-1:0]   idx  = cpu_addr[9:4];
     wire [TAG_W-1:0]   tag  = cpu_addr[31:10];
@@ -68,6 +70,7 @@ module icache #(
     assign cpu_rdata = data[idx][word];
 
     integer i;
+    // refill 状态机同时维护统计计数器；invalidate 会使所有行失效并清零统计。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             for (i = 0; i < LINES; i = i + 1) valid[i] <= 1'b0;

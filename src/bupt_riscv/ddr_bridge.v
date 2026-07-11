@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// CPU 阻塞式访存请求到 DDR 后端的桥接器。
+// 一次只允许一个 outstanding transaction：CPU 保持请求稳定，直到 cpu_ready 返回。
 module ddr_bridge(
     input wire clk,
     input wire rst,
@@ -31,6 +33,8 @@ module ddr_bridge(
     input wire backend_busy
     );
 
+    // S_IDLE 接收 CPU 请求，S_ISSUE 等待后端接收，S_WAIT 等待响应，
+    // S_DONE 保持完成脉冲一个总线周期，避免 CPU 重复采样。
     localparam S_IDLE = 2'd0;
     localparam S_ISSUE = 2'd1;
     localparam S_WAIT = 2'd2;

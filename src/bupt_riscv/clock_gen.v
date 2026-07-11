@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 板级时钟生成模块。
+// 通过 Vivado 时钟 IP 将 100 MHz 输入时钟转换为 SoC 时钟和 DDR/MIG 所需时钟，
+// locked 表示内部 MMCM/PLL 已完成锁定，系统通常在该信号有效后再释放复位。
 module clock_gen(
     input wire clk100,
     input wire rst,

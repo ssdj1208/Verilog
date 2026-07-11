@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 迭代除法/取余单元。
+// 使用逐位试商算法实现 RV32M 的 DIV、DIVU、REM 和 REMU，结果需要多个时钟周期。
+// 模块同时处理除数为零及有符号最小值除以 -1 等规范规定的特殊情况。
 module iter_div(
     input wire clk,
     input wire rst,
@@ -35,6 +38,7 @@ module iter_div(
     wire[31:0] quotient_signed = quotient_neg ? (~quotient_next + 32'd1) : quotient_next;
     wire[31:0] remainder_signed = remainder_neg ? (~remainder_next + 32'd1) : remainder_next;
 
+    // busy 期间每拍推进一次商/余数计算，完成后锁存结果并拉高 done 一拍。
     always @(posedge clk) begin
         if (rst) begin
             busy <= 1'b0;

@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 仿真用 DDR 后端模型。
+// 通过 CALIB_CYCLES 模拟 MIG 校准，通过独立读写延迟模拟真实 DDR 的非零响应时间。
 module ddr_model #(
     parameter ADDR_WIDTH = 12,
     parameter CALIB_CYCLES = 32,
@@ -39,12 +41,14 @@ module ddr_model #(
     assign busy = (state != S_IDLE) | ~init_calib_complete;
 
     integer i;
+    // 仿真启动时清空模型内存，保证每次测试从确定状态开始。
     initial begin
         for (i = 0; i < (1 << ADDR_WIDTH); i = i + 1) begin
             mem[i] = 32'b0;
         end
     end
 
+    // 状态机在校准完成后接受单个请求，等待配置的延迟，再发出响应脉冲。
     always @(posedge clk) begin
         if (rst) begin
             state <= S_IDLE;

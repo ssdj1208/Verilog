@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// RV32I/RV32M 五级流水线 CPU 核心。
+// 流水级依次为 IF、ID、EX、MEM、WB，支持基本 RV32I、RV32M 乘除法、
+// 分支预测、数据前递、load-use 冒险处理、机器模式 CSR 和外部中断。
 module riscv(
     input wire clk,
     input wire rst,
@@ -73,6 +76,7 @@ module riscv(
     localparam ALU_REM   = 5'd17;
     localparam ALU_REMU  = 5'd18;
 
+    // 全局流水线控制：stall 用于保持级间状态，flush 用于注入气泡。
     wire stallF;
     wire stallD;
     wire flushD;
@@ -82,6 +86,7 @@ module riscv(
     wire idex_en;
     wire validE;
 
+    // IF 阶段 PC 选择和取指等待控制。
     wire[31:0] pcplus4F = pcF + 32'd4;
     wire pred_takenF;
     wire[31:0] pred_targetF;
@@ -95,7 +100,8 @@ module riscv(
     reg[31:0] fetch_redirect_targetR;
     wire fetch_redirectF = fetch_redirectR & ~stallD;
 
-    // ---- Machine-mode CSR / trap state (declared early, used by pcnextF) ----
+    // 机器模式 CSR/异常状态。该区域提前声明，是因为 IF 阶段的 PC 选择需要
+    // 直接跳转到 mtvec 或从 mepc 返回。
     reg [31:0] mtvec;
     reg [31:0] mepc;
     reg [31:0] mcause;
@@ -125,7 +131,7 @@ module riscv(
     wire pc_en = ((~stallD) | pc_redirectF) & ~memstallM;
     pc #(32) pcreg(clk, rst, pc_en, pcnextF, pcF);
 
-    // IF/ID
+    // IF/ID：锁存取指结果、PC 和分支预测信息；flushD 时清除错误路径指令。
     wire[31:0] instrD;
     wire[31:0] pcD;
     wire[31:0] pcplus4D;
@@ -199,6 +205,7 @@ module riscv(
     reg csr_immD;       // 1 if immediate form (csrrwi/si/ci)
     reg mretD;
 
+    // ID 阶段指令译码：默认生成无副作用控制，再根据 opcode/funct 字段覆盖。
     always @(*) begin
         regwriteD = 1'b0;
         memreadD = 1'b0;
@@ -331,7 +338,7 @@ module riscv(
         endcase
     end
 
-    // ID/EX
+    // ID/EX：将译码结果、操作数和控制信号送入执行阶段。
     wire[31:0] pcE, pcplus4E, rd1E, rd2E, immE;
     wire[31:0] instrE;
     wire[4:0] rs1E, rs2E, rdE;
@@ -361,6 +368,7 @@ module riscv(
     wire[1:0] wbselW;
     wire[31:0] loadDataW;
 
+    // ID 阶段前递用于分支比较和依赖判断；优先使用较新的 EX/MEM 结果。
     wire[1:0] forwardaD =
         (rs1D != 5'b0) ?
             ((rs1D == rdE) && regwriteE && validE && (wbselE != WB_MEM)) ? 2'b10 :
@@ -374,6 +382,7 @@ module riscv(
     wire[1:0] forwardaE;
     wire[1:0] forwardbE;
 
+    // 数据访存或迭代乘除法进行时冻结前端和 ID/EX 寄存器。
     assign idex_en = ~memstallM & ~divstallE;
 
     flopenrc #(32) idex_pc(clk, rst, idex_en, flushE, pcD, pcE);
@@ -410,6 +419,7 @@ module riscv(
     flopenrc #(2)  idex_forwarda(clk, rst, idex_en, flushE, forwardaD, forwardaE);
     flopenrc #(2)  idex_forwardb(clk, rst, idex_en, flushE, forwardbD, forwardbE);
 
+    // EX 阶段操作数选择：前递结果优先于 ID/EX 中的原始寄存器值。
     wire[31:0] srca_forwardE = (forwardaE == 2'b10) ? resultM :
                                 (forwardaE == 2'b01) ? resultW : rd1E;
     wire[31:0] srcb_forwardE = (forwardbE == 2'b10) ? resultM :
@@ -418,6 +428,7 @@ module riscv(
                            (srca_selE == 2'b10) ? 32'b0 : srca_forwardE;
     wire[31:0] aluSrcBE = alusrcE ? immE : srcb_forwardE;
 
+    // 基本 ALU、迭代乘法器和迭代除法器共享 EX 阶段结果选择。
     wire[31:0] aluResultE;
     alu alu(aluSrcAE, aluSrcBE, alucontrolE, aluResultE);
 
@@ -478,6 +489,7 @@ module riscv(
     wire[31:0] executeResultE = div_opE ? div_resultE :
                                 mul_opE ? mul_resultE : aluResultE;
 
+    // EX 阶段计算分支实际条件和目标，用于预测校验与 PC 重定向。
     wire branch_takenE =
         (funct3E == 3'b000) ? (srca_forwardE == srcb_forwardE) :
         (funct3E == 3'b001) ? (srca_forwardE != srcb_forwardE) :
@@ -508,6 +520,7 @@ module riscv(
     assign bp_invalidateE = nonbranch_pred_takenE & ~memstallM & ~trap_flush & ~redirectE;
     assign redirect_targetE = actual_takenE ? actual_targetE : pcplus4E;
 
+    // 重定向请求延迟一拍提交，避开数据访存阻塞对错误路径清除的影响。
     always @(posedge clk) begin
         if (rst) begin
             redirect_pendingR <= 1'b0;
@@ -525,10 +538,10 @@ module riscv(
         end
     end
 
-    // ---- mret commit ----
+    // mret 提交：恢复 MIE/MPIE 并将 PC 重定向到 mepc。
     assign mret_take = mretE & trap_can_take;
 
-    // ---- CSR read (combinational, EX stage) ----
+    // EX 阶段 CSR 读：仅实现当前核心使用的 machine-mode CSR。
     wire meip = (|irq) & meie;
     reg [31:0] csr_rdataE;
     always @(*) begin
@@ -543,7 +556,7 @@ module riscv(
         endcase
     end
 
-    // ---- CSR write data / new value (combinational, EX stage) ----
+    // EX 阶段 CSR 写数据及新值计算，支持 write/set/clear 和立即数形式。
     wire [31:0] csr_wdataE = csr_immE ? {27'b0, zimmE} : srca_forwardE;
     wire [1:0]  csr_op_kind = csr_opE[1:0]; // 01=w, 10=s, 11=c
     wire [31:0] csr_newE = (csr_op_kind == 2'b01) ? csr_wdataE :
@@ -552,7 +565,8 @@ module riscv(
                           csr_rdataE;
     wire csr_we_eff = csr_weE & validE & ~memstallM;
 
-    // ---- CSR register file writes (trap/mret have priority over CSR instr) ----
+    // CSR 写回：trap/mret 优先级高于普通 CSR 指令，避免异常状态被覆盖。
+    // 分支调试寄存器保存最近一次真实分支的比较操作数和预测结果。
     always @(posedge clk) begin
         if (rst) begin
             mstatus <= 32'h00000000;
@@ -597,7 +611,7 @@ module riscv(
         end
     end
 
-    // EX/MEM
+    // EX/MEM：锁存执行结果、访存地址、store 数据和 WB 控制。
     wire[31:0] storeDataM;
     wire[31:0] instrM;
     wire[2:0] load_funct3M;
@@ -633,7 +647,7 @@ module riscv(
     wire[31:0] loadDataM;
     load_ext load_extM(readdataM, aluResultM[1:0], load_funct3M, loadDataM);
 
-    // MEM/WB
+    // MEM/WB：锁存数据存储器返回值及最终写回所需的各路结果。
     wire validW;
     wire retire_validW;
     wire[31:0] instrW;
@@ -649,10 +663,12 @@ module riscv(
     flopenr #(1)  memwb_retire_valid(clk, rst, ~memstallM, (regwriteM | memreadM | memwriteM), retire_validW);
     flopenr #(32) memwb_csr(clk, rst, ~memstallM, csr_rdataM, csr_rdataW);
 
+    // WB 阶段结果多路选择：ALU、访存、PC+4 或 CSR 返回值。
     assign resultW = (wbselW == WB_MEM) ? loadDataW :
                      (wbselW == WB_PC4) ? pcplus4W :
                      (wbselW == WB_CSR) ? csr_rdataW : aluoutW;
 
+    // load-use 冒险无法通过普通前递解决，因此暂停 IF/ID 并冲刷 EX 一拍。
     wire lwstallD = memreadE &&
         (((rs1D == rdE) && uses_rs1D && (rs1D != 5'b0)) ||
          ((rs2D == rdE) && uses_rs2D && (rs2D != 5'b0)));
@@ -667,6 +683,7 @@ module riscv(
     reg[31:0] bp_pcR;
     reg[31:0] bp_targetR;
 
+    // 将 EX 阶段的分支结果转换为预测器下一周期可用的更新请求。
     always @(posedge clk) begin
         if (rst) begin
             bp_updateR <= 1'b0;
@@ -687,6 +704,7 @@ module riscv(
         end
     end
 
+    // BTB/分支预测器：取指查询，执行阶段更新或失效。
     branch_predictor bp(
         .clk(clk),
         .rst(rst),
@@ -700,6 +718,7 @@ module riscv(
         .targetE(bp_targetR)
         );
 
+    // 演示和性能接口只观察内部状态，不参与 CPU 控制数据通路。
     assign demo_pcF = pcF;
     assign demo_pcD = pcD;
     assign demo_pcE = pcE;

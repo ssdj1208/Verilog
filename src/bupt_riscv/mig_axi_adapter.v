@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 32 位后端请求到 64 位 AXI MIG 应用接口的适配器。
+// 后端一次访问一个 32 位字，AXI 侧按 64 位 beat 传输；backend_addr[2]
+// 选择低半字或高半字，并相应调整写数据和写选通。
 module mig_axi_adapter(
     input wire clk,
     input wire rst,
@@ -58,6 +61,8 @@ module mig_axi_adapter(
     output reg s_axi_rready
     );
 
+    // 写事务等待 AW/W/B 通道完成，读事务等待 AR/R 通道完成，
+    // 最后在 S_RESP 产生一个后端响应脉冲。
     localparam S_IDLE = 2'd0;
     localparam S_WRITE = 2'd1;
     localparam S_READ = 2'd2;
@@ -89,6 +94,7 @@ module mig_axi_adapter(
     assign s_axi_arprot = 3'b000;
     assign s_axi_arqos = 4'b0000;
 
+    // AXI valid 在握手前保持，ready 只在对应通道完成后撤销。
     always @(posedge clk) begin
         if (rst) begin
             state <= S_IDLE;

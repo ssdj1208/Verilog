@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 八位七段数码管动态扫描驱动。
+// value_i 按十六进制拆分到各个数码管，扫描计数器控制位选，
+// 点号和有效标志用于显示附加状态或提示当前数据是否有效。
 module hex_display(
     input wire clk,
     input wire rst,
@@ -15,6 +18,7 @@ module hex_display(
     wire[2:0] scan_idx = scan_div_r[15:13];
     reg[3:0] digit;
 
+    // 共阳极/低有效段码转换表：输出 bit 为 0 表示点亮对应段。
     function [6:0] hex_to_seg;
         input [3:0] value;
         begin
@@ -39,6 +43,7 @@ module hex_display(
         end
     endfunction
 
+    // 动态扫描分频计数器和复位后的显示状态。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             scan_div_r <= 16'b0;
@@ -47,6 +52,7 @@ module hex_display(
         end
     end
 
+    // 组合逻辑根据当前扫描位选择十六进制数字和小数点状态。
     always @(*) begin
         case (scan_idx)
             3'd0: an_o = 8'b11111110;

@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 流水线演示面板。
+// 将 CPU 五级流水线的 PC、指令、有效位、暂停和冲刷状态映射到板载显示器件。
 module pipeline_demo_panel(
     input wire clk,
     input wire rst,
@@ -39,6 +41,7 @@ module pipeline_demo_panel(
     );
 
     reg [15:0] scan_div_r;
+    // 扫描分频计数器的高位作为当前数码管编号。
     wire [2:0] scan_idx = scan_div_r[15:13];
 
     wire [31:0] detail_pc =
@@ -62,6 +65,7 @@ module pipeline_demo_panel(
     reg [3:0] hex_digit;
     reg dp_en;
 
+    // 低有效七段数码管段码表。
     function [6:0] hex_to_seg;
         input [3:0] value;
         begin
@@ -86,6 +90,7 @@ module pipeline_demo_panel(
         end
     endfunction
 
+    // 页面状态和动态扫描计数器；每次 page_toggle_i 有效时翻转页面。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             page_o <= 1'b0;
@@ -99,6 +104,7 @@ module pipeline_demo_panel(
     end
 
     always @(*) begin
+        // LED 位定义：低位显示流水线有效位，高位显示暂停、冲刷和运行状态。
         led_o = 16'b0;
         led_o[0] = validF_i;
         led_o[1] = validD_i;
@@ -119,6 +125,7 @@ module pipeline_demo_panel(
     end
 
     always @(*) begin
+        // 数码管扫描逻辑：按页面选择 PC、指令或验收结果的当前十六进制半字节。
         case (scan_idx)
             3'd0: an_o = 8'b11111110;
             3'd1: an_o = 8'b11111101;

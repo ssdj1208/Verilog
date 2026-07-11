@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// UART 接收器，采用 8 位数据、1 个起始位、1 个停止位、无奇偶校验格式。
+// 检测起始位后按位中心采样，完整接收后在 rx_valid 上输出一个时钟周期的脉冲。
 module uart_rx #(
     parameter CLKS_PER_BIT = 868
 )(
@@ -23,6 +25,7 @@ module uart_rx #(
     reg rx_meta;
     reg rx_sync;
 
+    // 两级同步器将异步串行输入安全地带入本地 clk 时钟域。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             rx_meta <= 1'b1;
@@ -33,6 +36,7 @@ module uart_rx #(
         end
     end
 
+    // 接收状态机：确认起始位、采样数据位并检查停止位。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= S_IDLE;

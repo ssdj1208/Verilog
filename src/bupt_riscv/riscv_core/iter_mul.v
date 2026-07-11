@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 迭代乘法器。
+// 启动后逐周期计算部分积，busy 表示运算进行中，done 在结果完成时产生单周期脉冲。
+// op 区分低 32 位乘积和 RV32M 的三种高位乘积形式。
 module iter_mul(
     input wire clk,
     input wire rst,
@@ -29,6 +32,7 @@ module iter_mul(
     wire[63:0] acc_next = multiplier[0] ? (acc + multiplicand) : acc;
     wire[63:0] product_signed = result_neg ? (~acc_next + 64'd1) : acc_next;
 
+    // start 仅在空闲时接受新操作，每拍推进一次乘法迭代。
     always @(posedge clk) begin
         if (rst) begin
             busy <= 1'b0;

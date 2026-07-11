@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 浮点演示 MMIO 外设。
+// 通过 MMIO 接收两个正的单精度浮点操作数和运算选择，保存结果并提供 ready 状态。
 module fp_mmio(
     input wire clk,
     input wire rst,
@@ -14,6 +16,7 @@ module fp_mmio(
     reg[31:0] op_b;
     reg[1:0] op_sel; // 0 add, 1 mul
     reg[31:0] result_reg;
+    // busy_count 用于控制启动后的固定处理延迟。
     reg[1:0] busy_count;
     reg busy;
     reg ready;
@@ -78,6 +81,7 @@ module fp_mmio(
     end
 endmodule
 
+// 正数单精度浮点加法器：指数对齐、尾数相加、规格化并重新编码。
 module fp32_add_pos(
     input wire[31:0] a,
     input wire[31:0] b,
@@ -92,6 +96,7 @@ module fp32_add_pos(
     reg[7:0] exp_y;
     reg[22:0] frac_y;
 
+    // 组合加法数据通路，不保存跨周期状态。
     always @(*) begin
         if (a[30:0] == 31'b0) begin
             y = b;
@@ -126,6 +131,7 @@ module fp32_add_pos(
     end
 endmodule
 
+// 正数单精度浮点乘法器：计算尾数乘积和阶码相加后的规格化结果。
 module fp32_mul_pos(
     input wire[31:0] a,
     input wire[31:0] b,
@@ -137,6 +143,7 @@ module fp32_mul_pos(
     reg[7:0] exp_y;
     reg[22:0] frac_y;
 
+    // 组合乘法数据通路，不保存跨周期状态。
     always @(*) begin
         if (a[30:0] == 31'b0 || b[30:0] == 31'b0) begin
             y = 32'b0;

@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 自动验收 MMIO 外设。
+// 软件通过固定地址写入控制、状态、失败位和显示槽位，硬件保存结果并提供读回。
 module acceptance_mmio(
     input wire clk,
     input wire rst,
@@ -29,6 +31,7 @@ module acceptance_mmio(
     wire[3:0] slot_index = addr[5:2];
 
     integer slot;
+    // 写寄存器在时钟沿提交；复位清除上一轮验收内容。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             control_r <= 32'b0;
@@ -56,6 +59,7 @@ module acceptance_mmio(
         end
     end
 
+    // 组合读回逻辑，根据地址选择控制、状态或显示槽位数据。
     always @(*) begin
         if (addr == 8'h00) begin
             rdata = control_r;

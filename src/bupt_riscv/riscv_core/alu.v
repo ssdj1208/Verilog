@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// RISC-V 执行单元中的组合 ALU。
+// 除 RV32I 基本算术/逻辑和移位操作外，还提供 RV32M 运算选择编码；
+// 乘除法本身由上层迭代单元完成或通过对应控制信号接入。
 module alu(
     input wire[31:0] a,
     input wire[31:0] b,
@@ -27,6 +30,7 @@ module alu(
     localparam ALU_REM   = 5'd17;
     localparam ALU_REMU  = 5'd18;
 
+    // ALU 不含内部状态，所有结果均由当前操作码和两个输入组合产生。
     always @(*) begin
         case (op)
             ALU_ADD:   y = a + b;

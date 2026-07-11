@@ -1,5 +1,11 @@
 `timescale 1ns / 1ps
 
+// Load 数据扩展单元。
+// 根据访问宽度和 signed 标志，从总线返回的 32 位字中提取 byte/halfword/word，
+// 并将较窄数据按有符号或无符号规则扩展到 XLEN=32 位。
+// Load 数据扩展单元。
+// 从总线返回的 32 位数据中按地址和访问宽度提取 byte/halfword/word，
+// 再根据 signed 标志进行符号扩展或零扩展。
 module load_ext(
     input wire[31:0] rdata,
     input wire[1:0] addr,
@@ -10,6 +16,7 @@ module load_ext(
     reg[7:0] byte_val;
     reg[15:0] half_val;
 
+    // 组合选择，不保存任何访存状态。
     always @(*) begin
         case (addr)
             2'b00: byte_val = rdata[7:0];

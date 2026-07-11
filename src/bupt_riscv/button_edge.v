@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 按键同步与边沿检测模块。
+// raw_i 先在 clk 域内采样，再输出稳定电平和单周期 pressed_o 脉冲。
+// CTR_WIDTH 决定消抖计数器宽度；计数器饱和后才接受新的按键状态。
 module button_edge #(
     parameter integer CTR_WIDTH = 19
 )(
@@ -17,6 +20,7 @@ module button_edge #(
     wire sync_level = sync_r[1];
     wire stable_done = &stable_count_r;
 
+    // 异步复位清空历史采样值；正常工作时完成同步、消抖和上升沿检测。
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             sync_r <= 2'b00;

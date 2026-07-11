@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 流水线演示时钟/运行控制器。
+// 根据启动脉冲、运行状态和速度选择产生演示用的单步或连续运行节拍。
+// 该模块只负责控制节拍，不参与 CPU 数据通路和指令执行。
 module demo_clock_ctrl #(
     parameter integer SLOW_DIV = 25000000,
     parameter integer FAST_DIV = 5000000,
@@ -30,6 +33,7 @@ module demo_clock_ctrl #(
     wire run_tick = demo_mode_i && run_active_o && pace_hit;
     wire demo_pulse_req = startup_active || step_i || run_tick;
 
+    // 主时钟域：保存运行模式、启动阶段计数和节拍分频状态。
     always @(posedge clk_i or posedge rst_i) begin
         if (rst_i) begin
             run_active_o <= 1'b0;
@@ -68,6 +72,7 @@ module demo_clock_ctrl #(
         .O(soc_clk_o)
         );
 `else
+    // 下降沿域：生成跨到主时钟逻辑前的窄脉冲，避免同一上升沿重复触发。
     always @(negedge clk_i or posedge rst_i) begin
         if (rst_i) begin
             soc_gate_r <= 1'b0;

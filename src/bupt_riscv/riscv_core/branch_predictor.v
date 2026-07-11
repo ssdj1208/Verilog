@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 简单分支预测器/BTB。
+// 取指阶段使用当前 PC 查询预测目标，执行阶段用真实结果更新或失效对应条目。
 module branch_predictor(
     input wire clk,
     input wire rst,
@@ -27,6 +29,7 @@ module branch_predictor(
     assign pred_takenF = tag_matchF && counter[idxF][1];
     assign pred_targetF = target[idxF];
 
+    // 预测表只在时钟沿更新；非分支指令命中错误 BTB 时清除对应条目。
     always @(posedge clk) begin
         if (rst) begin
             for (i = 0; i < 128; i = i + 1) begin

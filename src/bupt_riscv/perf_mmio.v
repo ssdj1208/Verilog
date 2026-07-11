@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 
+// 性能计数器 MMIO 外设。
+// 累计周期、退休指令、分支、预测失败、各类暂停/冲刷和前递事件，
+// 软件可通过写 clear 位清零整组计数器。
 module perf_mmio(
     input wire clk,
     input wire rst,
@@ -38,6 +41,7 @@ module perf_mmio(
 
     wire clear = rst || (we && addr == 6'h1c && wdata[0]);
 
+    // 每个事件输入为单周期脉冲时，对应计数器递增一次。
     always @(posedge clk) begin
         if (clear) begin
             cycles <= 32'b0;
@@ -70,6 +74,7 @@ module perf_mmio(
         end
     end
 
+    // 根据 MMIO 偏移选择要返回的统计值。
     always @(*) begin
         case (addr)
             6'h00: rdata = cycles;

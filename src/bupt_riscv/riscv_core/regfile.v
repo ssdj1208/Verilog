@@ -1,25 +1,6 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company:
-// Engineer:
-//
-// Create Date: 2017/11/02 14:20:09
-// Design Name:
-// Module Name: regfile
-// Project Name:
-// Target Devices:
-// Tool Versions:
-// Description:
-//
-// Dependencies:
-//
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-//
-//////////////////////////////////////////////////////////////////////////////////
-
-
+// RV32I 32×32 通用寄存器堆。
+// x0 始终读为 0；写端在下降沿提交，使同一周期的组合读保持稳定。
 module regfile(
 	input wire clk,
 	input wire we3,
@@ -30,6 +11,7 @@ module regfile(
 
 	reg [31:0] rf[31:0];
 
+	// 只有有效写回且 rd 不为 x0 时才更新寄存器。
 	always @(negedge clk) begin
 		if(we3 && (wa3 != 5'b0)) begin
 			 rf[wa3] <= wd3;

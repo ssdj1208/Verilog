@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// 片上 Block RAM 包装器。
+// 支持按字节写使能，读端保持简单的同步读接口，供总线中的片上 RAM 使用。
 module bram_ram #(
     parameter ADDR_WIDTH = 10
 )(
@@ -13,6 +15,7 @@ module bram_ram #(
 
     reg [31:0] ram[0:(1 << ADDR_WIDTH)-1];
 
+    // 每个写选通位对应一个字节；未选通的字节保持原值。
     always @(posedge clk) begin
         if (we) begin
             if (wstrb[0]) ram[word_addr][7:0]   <= wdata[7:0];
