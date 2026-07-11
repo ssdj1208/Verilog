@@ -35,6 +35,12 @@ module simple_bus #(
     input wire uart_rx_i,
     output wire uart_tx_o,
     output wire[15:0] led,
+    output wire acceptance_active,
+    output wire[15:0] acceptance_status,
+    output wire[15:0] acceptance_fail,
+    output wire[31:0] acceptance_live_result,
+    output wire[31:0] acceptance_display_value,
+    output wire[7:0] acceptance_display_dp,
 
     output wire uart_tx_ready,
     output wire uart_rx_valid,
@@ -49,6 +55,7 @@ module simple_bus #(
     input wire perf_stall_ifetch,
     input wire perf_flush_branch,
     input wire perf_flush_trap,
+    input wire perf_forward,
     input wire[31:0] debug_branch_pc,
     input wire[31:0] debug_branch_srca,
     input wire[31:0] debug_branch_srcb,
@@ -68,6 +75,7 @@ module simple_bus #(
     wire fp_sel_d = (d_addr[31:8] == 24'h100070);
     wire debug_sel_d = (d_addr[31:8] == 24'h100080);
     wire panel_sel_d = (d_addr[31:8] == 24'h100090);
+    wire acceptance_sel_d = (d_addr[31:8] == 24'h1000a0);
     wire ddr_sel_d = (d_addr[31:27] == 5'b10000);
 
     wire ddr_ready;
@@ -111,6 +119,7 @@ module simple_bus #(
     reg[31:0] cache_mmio_rdata;
     reg[31:0] debug_rdata;
     wire[31:0] panel_rdata = {16'b0, panel_switches_i};
+    wire[31:0] acceptance_rdata;
     wire[31:0] fp_rdata;
     wire timer_irq;
 
@@ -225,7 +234,25 @@ module simple_bus #(
         .stall_ifetch(perf_stall_ifetch),
         .stall_ddr_wait(d_valid & ddr_sel_d & ~cache_ready),
         .flush_branch(perf_flush_branch),
-        .flush_trap(perf_flush_trap)
+        .flush_trap(perf_flush_trap),
+        .forward_event(perf_forward)
+        );
+
+    acceptance_mmio acceptance(
+        .clk(clk),
+        .rst(rst),
+        .we(d_we_local & acceptance_sel_d & |d_wstrb),
+        .re(d_re & acceptance_sel_d),
+        .addr(d_addr[7:0]),
+        .wdata(d_wdata),
+        .display_sel_i(panel_switches_i[3:0]),
+        .rdata(acceptance_rdata),
+        .active_o(acceptance_active),
+        .status_o(acceptance_status),
+        .fail_o(acceptance_fail),
+        .live_result_o(acceptance_live_result),
+        .display_value_o(acceptance_display_value),
+        .display_dp_o(acceptance_display_dp)
         );
 
     fp_mmio fp(
@@ -334,6 +361,7 @@ module simple_bus #(
                      fp_sel_d         ? fp_rdata :
                      debug_sel_d      ? debug_rdata :
                      panel_sel_d      ? panel_rdata :
+                     acceptance_sel_d ? acceptance_rdata :
                      ddr_status_sel_d ? {30'b0, ddr_busy, ddr_calib_done} :
                      ddr_sel_d        ? cache_rdata : 32'b0;
 endmodule

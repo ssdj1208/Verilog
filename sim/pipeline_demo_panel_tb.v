@@ -6,6 +6,7 @@ module pipeline_demo_panel_tb();
     reg page_toggle;
     reg[2:0] stage_sel;
     reg stall_loaduse;
+    reg result_page;
     wire[15:0] led;
     wire[7:0] an;
     wire[6:0] seg;
@@ -17,6 +18,7 @@ module pipeline_demo_panel_tb();
         .rst(rst),
         .demo_mode_i(1'b1),
         .page_toggle_i(page_toggle),
+        .result_page_i(result_page),
         .stage_sel_i(stage_sel),
         .run_active_i(1'b0),
         .speed_sel_i(1'b1),
@@ -41,6 +43,7 @@ module pipeline_demo_panel_tb();
         .stall_dcache_i(1'b0),
         .flush_branch_i(1'b1),
         .flush_trap_i(1'b0),
+        .result_value_i(32'h13579bdf),
         .led_o(led),
         .an_o(an),
         .seg_o(seg),
@@ -58,6 +61,7 @@ module pipeline_demo_panel_tb();
         page_toggle = 1'b0;
         stage_sel = 3'd2;
         stall_loaduse = 1'b1;
+        result_page = 1'b0;
         #20;
         rst = 1'b0;
         #1;
@@ -86,6 +90,14 @@ module pipeline_demo_panel_tb();
         #1;
         if (seg !== 7'b0011001) begin
             $display("Simulation Failed: panel stage select mismatch seg=%b", seg);
+            $finish;
+        end
+
+        result_page = 1'b1;
+        stage_sel = 3'd2;
+        #1;
+        if (seg !== 7'b0001110) begin
+            $display("Simulation Failed: panel result page mismatch seg=%b", seg);
             $finish;
         end
 

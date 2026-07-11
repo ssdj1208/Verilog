@@ -223,6 +223,15 @@ module top(
     wire uart_tx_ready;
     wire uart_rx_valid;
     wire[15:0] soc_led;
+    wire acceptance_active;
+    wire[15:0] acceptance_status;
+    wire[15:0] acceptance_fail;
+    wire[31:0] acceptance_live_result;
+    wire[31:0] acceptance_display_value;
+    wire[7:0] acceptance_display_dp;
+    wire[7:0] acceptance_an;
+    wire[6:0] acceptance_seg;
+    wire acceptance_dp;
     wire[15:0] demo_led;
     wire[7:0] demo_an;
     wire[6:0] demo_seg;
@@ -262,6 +271,12 @@ module top(
         .uart_rx_i(uart_rx_i),
         .uart_tx_o(uart_tx_o),
         .led(soc_led),
+        .acceptance_active(acceptance_active),
+        .acceptance_status(acceptance_status),
+        .acceptance_fail(acceptance_fail),
+        .acceptance_live_result(acceptance_live_result),
+        .acceptance_display_value(acceptance_display_value),
+        .acceptance_display_dp(acceptance_display_dp),
         .ddr_backend_valid(ddr_backend_valid),
         .ddr_backend_we(ddr_backend_we),
         .ddr_backend_wstrb(ddr_backend_wstrb),
@@ -307,6 +322,7 @@ module top(
         .rst(por_rst),
         .demo_mode_i(demo_mode_latched),
         .page_toggle_i(page_btn_pulse),
+        .result_page_i(sw[7]),
         .stage_sel_i(sw[2:0]),
         .run_active_i(demo_run_active),
         .speed_sel_i(demo_speed_sel),
@@ -331,6 +347,7 @@ module top(
         .stall_dcache_i(demo_stall_dcache),
         .flush_branch_i(demo_flush_branch),
         .flush_trap_i(demo_flush_trap),
+        .result_value_i(acceptance_live_result),
         .led_o(demo_led),
         .an_o(demo_an),
         .seg_o(demo_seg),
@@ -338,10 +355,25 @@ module top(
         .page_o()
         );
 
-    assign led = demo_mode_latched ? demo_led : soc_led;
-    assign an = demo_mode_latched ? demo_an : 8'hff;
-    assign seg = demo_mode_latched ? demo_seg : 7'h7f;
-    assign dp = demo_mode_latched ? demo_dp : 1'b1;
+    hex_display acceptance_panel(
+        .clk(soc_clk_100mhz),
+        .rst(por_rst),
+        .enable_i(acceptance_active),
+        .value_i(acceptance_display_value),
+        .dp_mask_i(acceptance_display_dp),
+        .an_o(acceptance_an),
+        .seg_o(acceptance_seg),
+        .dp_o(acceptance_dp)
+        );
+
+    assign led = demo_mode_latched ? demo_led :
+                 acceptance_active ? acceptance_status : soc_led;
+    assign an = demo_mode_latched ? demo_an :
+                acceptance_active ? acceptance_an : 8'hff;
+    assign seg = demo_mode_latched ? demo_seg :
+                 acceptance_active ? acceptance_seg : 7'h7f;
+    assign dp = demo_mode_latched ? demo_dp :
+                acceptance_active ? acceptance_dp : 1'b1;
 
     ddr_backend_cdc ddr_cdc(
         .bus_clk(bus_clk),

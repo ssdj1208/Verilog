@@ -170,6 +170,7 @@ rv32>
 
 ```text
 help
+accept
 mem
 cache
 fp
@@ -181,6 +182,7 @@ perf
 预期行为：
 
 - `help` 输出命令列表。
+- `accept` 运行加强版自动验收，直接输出 CPI、IPC、MIPS、Cache 命中率和分支预测准确率；`accept clear` 退出验收面板。
 - `mem` 再次执行 DDR 测试，输出 `DDR TEST OK`。
 - `cache` 再次执行 Cache/LRU 测试，输出 `CACHE READY`。
 - `fp` 再次执行 FP32 协处理器测试，输出 `FP TEST OK`。

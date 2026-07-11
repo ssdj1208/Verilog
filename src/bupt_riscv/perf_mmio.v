@@ -18,7 +18,8 @@ module perf_mmio(
     input wire stall_ifetch,
     input wire stall_ddr_wait,
     input wire flush_branch,
-    input wire flush_trap
+    input wire flush_trap,
+    input wire forward_event
     );
 
     reg[31:0] cycles;
@@ -33,6 +34,7 @@ module perf_mmio(
     reg[31:0] stalls_ddr_wait;
     reg[31:0] flushes_branch;
     reg[31:0] flushes_trap;
+    reg[31:0] forwards;
 
     wire clear = rst || (we && addr == 6'h1c && wdata[0]);
 
@@ -50,6 +52,7 @@ module perf_mmio(
             stalls_ddr_wait <= 32'b0;
             flushes_branch <= 32'b0;
             flushes_trap <= 32'b0;
+            forwards <= 32'b0;
         end else begin
             cycles <= cycles + 32'd1;
             if (retire) retired <= retired + 32'd1;
@@ -63,6 +66,7 @@ module perf_mmio(
             if (stall_ddr_wait) stalls_ddr_wait <= stalls_ddr_wait + 32'd1;
             if (flush_branch) flushes_branch <= flushes_branch + 32'd1;
             if (flush_trap) flushes_trap <= flushes_trap + 32'd1;
+            if (forward_event) forwards <= forwards + 32'd1;
         end
     end
 
@@ -80,6 +84,7 @@ module perf_mmio(
             6'h24: rdata = stalls_ddr_wait;
             6'h28: rdata = flushes_branch;
             6'h2c: rdata = flushes_trap;
+            6'h30: rdata = forwards;
             default: rdata = 32'b0;
         endcase
     end

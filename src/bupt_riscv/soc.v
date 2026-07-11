@@ -11,6 +11,12 @@ module soc #(
     input wire uart_rx_i,
     output wire uart_tx_o,
     output wire[15:0] led,
+    output wire acceptance_active,
+    output wire[15:0] acceptance_status,
+    output wire[15:0] acceptance_fail,
+    output wire[31:0] acceptance_live_result,
+    output wire[31:0] acceptance_display_value,
+    output wire[7:0] acceptance_display_dp,
 
     output wire ddr_backend_valid,
     output wire ddr_backend_we,
@@ -75,6 +81,7 @@ module soc #(
     wire perf_stall_ifetch;
     wire perf_flush_branch;
     wire perf_flush_trap;
+    wire perf_forward;
     wire[31:0] debug_branch_pc;
     wire[31:0] debug_branch_srca;
     wire[31:0] debug_branch_srcb;
@@ -82,10 +89,16 @@ module soc #(
     reg[3:0] demo_loaduse_history_r;
     reg demo_loaduse_seen_r;
     reg[3:0] demo_muldiv_history_r;
+    reg demo_muldiv_seen_r;
     reg[3:0] demo_dcache_history_r;
+    reg demo_dcache_seen_r;
     reg[3:0] demo_ifetch_history_r;
+    reg demo_ifetch_seen_r;
     reg[3:0] demo_branch_history_r;
+    reg demo_branch_seen_r;
     reg[3:0] demo_trap_history_r;
+    reg demo_trap_seen_r;
+    reg[3:0] demo_scenario_r;
     wire[6:0] demo_opcodeD = demo_instrD[6:0];
     wire[6:0] demo_opcodeE = demo_instrE[6:0];
     wire[4:0] demo_load_rdE = demo_instrE[11:7];
@@ -132,6 +145,7 @@ module soc #(
         .perf_stall_ifetch(perf_stall_ifetch),
         .perf_flush_branch(perf_flush_branch),
         .perf_flush_trap(perf_flush_trap),
+        .perf_forward(perf_forward),
         .demo_pcF(demo_pcF),
         .demo_pcD(demo_pcD),
         .demo_pcE(demo_pcE),
@@ -186,6 +200,12 @@ module soc #(
         .uart_rx_i(uart_rx_i),
         .uart_tx_o(uart_tx_o),
         .led(led),
+        .acceptance_active(acceptance_active),
+        .acceptance_status(acceptance_status),
+        .acceptance_fail(acceptance_fail),
+        .acceptance_live_result(acceptance_live_result),
+        .acceptance_display_value(acceptance_display_value),
+        .acceptance_display_dp(acceptance_display_dp),
         .uart_tx_ready(uart_tx_ready),
         .uart_rx_valid(uart_rx_valid),
         .irq_lines(irq_lines),
@@ -199,6 +219,7 @@ module soc #(
         .perf_stall_ifetch(perf_stall_ifetch),
         .perf_flush_branch(perf_flush_branch),
         .perf_flush_trap(perf_flush_trap),
+        .perf_forward(perf_forward),
         .debug_branch_pc(debug_branch_pc),
         .debug_branch_srca(debug_branch_srca),
         .debug_branch_srcb(debug_branch_srcb),
@@ -214,27 +235,52 @@ module soc #(
             demo_loaduse_history_r <= 4'b0;
             demo_loaduse_seen_r <= 1'b0;
             demo_muldiv_history_r <= 4'b0;
+            demo_muldiv_seen_r <= 1'b0;
             demo_dcache_history_r <= 4'b0;
+            demo_dcache_seen_r <= 1'b0;
             demo_ifetch_history_r <= 4'b0;
+            demo_ifetch_seen_r <= 1'b0;
             demo_branch_history_r <= 4'b0;
+            demo_branch_seen_r <= 1'b0;
             demo_trap_history_r <= 4'b0;
+            demo_trap_seen_r <= 1'b0;
+            demo_scenario_r <= panel_switches_i[6:3];
+        end else if (demo_scenario_r != panel_switches_i[6:3]) begin
+            demo_loaduse_history_r <= 4'b0;
+            demo_loaduse_seen_r <= 1'b0;
+            demo_muldiv_history_r <= 4'b0;
+            demo_muldiv_seen_r <= 1'b0;
+            demo_dcache_history_r <= 4'b0;
+            demo_dcache_seen_r <= 1'b0;
+            demo_ifetch_history_r <= 4'b0;
+            demo_ifetch_seen_r <= 1'b0;
+            demo_branch_history_r <= 4'b0;
+            demo_branch_seen_r <= 1'b0;
+            demo_trap_history_r <= 4'b0;
+            demo_trap_seen_r <= 1'b0;
+            demo_scenario_r <= panel_switches_i[6:3];
         end else begin
             demo_loaduse_history_r <= {demo_loaduse_history_r[2:0], demo_loaduse_event};
             if (demo_loaduse_event) begin
                 demo_loaduse_seen_r <= 1'b1;
             end
             demo_muldiv_history_r <= {demo_muldiv_history_r[2:0], perf_stall_muldiv};
+            if (perf_stall_muldiv) demo_muldiv_seen_r <= 1'b1;
             demo_dcache_history_r <= {demo_dcache_history_r[2:0], perf_stall_dcache};
+            if (perf_stall_dcache) demo_dcache_seen_r <= 1'b1;
             demo_ifetch_history_r <= {demo_ifetch_history_r[2:0], perf_stall_ifetch};
+            if (perf_stall_ifetch) demo_ifetch_seen_r <= 1'b1;
             demo_branch_history_r <= {demo_branch_history_r[2:0], perf_flush_branch};
+            if (perf_flush_branch) demo_branch_seen_r <= 1'b1;
             demo_trap_history_r <= {demo_trap_history_r[2:0], perf_flush_trap};
+            if (perf_flush_trap) demo_trap_seen_r <= 1'b1;
         end
     end
 
     assign demo_stall_loaduse = demo_loaduse_event | (|demo_loaduse_history_r) | demo_loaduse_seen_r;
-    assign demo_stall_muldiv = perf_stall_muldiv | (|demo_muldiv_history_r);
-    assign demo_stall_dcache = perf_stall_dcache | (|demo_dcache_history_r);
-    assign demo_stall_ifetch = perf_stall_ifetch | (|demo_ifetch_history_r);
-    assign demo_flush_branch = perf_flush_branch | (|demo_branch_history_r);
-    assign demo_flush_trap = perf_flush_trap | (|demo_trap_history_r);
+    assign demo_stall_muldiv = perf_stall_muldiv | (|demo_muldiv_history_r) | demo_muldiv_seen_r;
+    assign demo_stall_dcache = perf_stall_dcache | (|demo_dcache_history_r) | demo_dcache_seen_r;
+    assign demo_stall_ifetch = perf_stall_ifetch | (|demo_ifetch_history_r) | demo_ifetch_seen_r;
+    assign demo_flush_branch = perf_flush_branch | (|demo_branch_history_r) | demo_branch_seen_r;
+    assign demo_flush_trap = perf_flush_trap | (|demo_trap_history_r) | demo_trap_seen_r;
 endmodule

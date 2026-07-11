@@ -5,6 +5,7 @@ module pipeline_demo_panel(
     input wire rst,
     input wire demo_mode_i,
     input wire page_toggle_i,
+    input wire result_page_i,
     input wire[2:0] stage_sel_i,
     input wire run_active_i,
     input wire speed_sel_i,
@@ -29,6 +30,7 @@ module pipeline_demo_panel(
     input wire stall_dcache_i,
     input wire flush_branch_i,
     input wire flush_trap_i,
+    input wire[31:0] result_value_i,
     output reg[15:0] led_o,
     output reg[7:0] an_o,
     output reg[6:0] seg_o,
@@ -128,7 +130,18 @@ module pipeline_demo_panel(
             default: an_o = 8'b01111111;
         endcase
 
-        if (!page_o) begin
+        if (result_page_i) begin
+            case (scan_idx)
+                3'd0: begin hex_digit = result_value_i[3:0];   dp_en = 1'b0; end
+                3'd1: begin hex_digit = result_value_i[7:4];   dp_en = 1'b0; end
+                3'd2: begin hex_digit = result_value_i[11:8];  dp_en = 1'b0; end
+                3'd3: begin hex_digit = result_value_i[15:12]; dp_en = 1'b0; end
+                3'd4: begin hex_digit = result_value_i[19:16]; dp_en = 1'b0; end
+                3'd5: begin hex_digit = result_value_i[23:20]; dp_en = 1'b0; end
+                3'd6: begin hex_digit = result_value_i[27:24]; dp_en = 1'b0; end
+                default: begin hex_digit = result_value_i[31:28]; dp_en = 1'b0; end
+            endcase
+        end else if (!page_o) begin
             case (scan_idx)
                 3'd0: begin hex_digit = detail_pc[3:0];   dp_en = detail_valid; end
                 3'd1: begin hex_digit = detail_pc[7:4];   dp_en = 1'b0; end

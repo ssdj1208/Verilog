@@ -52,6 +52,8 @@ D:\Xilinx\Vivado\2023.2\bin\vivado.bat -mode batch -source scripts\program_bupt_
 - `sw[15]`：模式选择
   - `0` 为正常模式
   - `1` 为流水演示模式
+- `sw[7]`：`0` 显示流水级 PC/指令，`1` 显示当前场景结果
+- `sw[6:3]`：选择综合、前递、load-use、RV32M、分支、D-Cache、I-Cache 或 Timer trap 场景
 - `sw[2:0]`：选择数码管当前观察的流水级
   - `000`：IF
   - `001`：ID
@@ -74,7 +76,7 @@ D:\Xilinx\Vivado\2023.2\bin\vivado.bat -mode batch -source scripts\program_bupt_
 - `led[14]`：速度档位
 - `led[15]`：当前是否处于演示模式
 
-`led[5]` 会锁存“本次复位后曾出现 load-use 依赖”，直到再次复位。观测层同时检查 CPU hazard 脉冲和相邻 ID/EX 指令的寄存器依赖，确保单周期冒险在实板上不会漏看。`led[6:10]` 保留最近 4 个 CPU 周期的事件；这只影响显示，不改变 CPU 的暂停或性能计数。
+`led[5:10]` 都会锁存事件，直到切换场景或复位。观测层同时检查 CPU hazard 脉冲和相邻 ID/EX 指令的寄存器依赖，确保单周期冒险在实板上不会漏看。这只影响显示，不改变 CPU 的暂停或性能计数。
 
 ### 3.4 数码管
 
@@ -90,9 +92,15 @@ D:\Xilinx\Vivado\2023.2\bin\vivado.bat -mode batch -source scripts\program_bupt_
 - 8 位数码管显示所选流水级的完整 `32-bit` 指令编码
 - 由 `sw[2:0]` 选择 IF、ID、EX、MEM 或 WB
 
+#### 场景结果页
+
+- 将 `sw[7]` 置 1
+- 显示当前场景写入验收 MMIO 的 32 位结果或事件计数
+- 将 `sw[7]` 置 0 后恢复 PC/指令页
+
 ## 4. 演示程序里能看到什么
 
-演示模式启动后，CPU 会反复执行一段固定短程序，循环覆盖以下现象：
+场景 0 保留原固定短程序；`sw[6:3]` 的 1～7 分别提供前递、load-use、RV32M、分支、D-Cache、I-Cache 和 Timer trap 的确定性循环。
 
 - 普通顺序流动：`addi / add / sub`
 - 前递：后一条指令立即使用前一条 ALU 结果

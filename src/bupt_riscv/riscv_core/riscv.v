@@ -24,6 +24,7 @@ module riscv(
     output wire perf_stall_ifetch,
     output wire perf_flush_branch,
     output wire perf_flush_trap,
+    output wire perf_forward,
     output wire[31:0] demo_pcF,
     output wire[31:0] demo_pcD,
     output wire[31:0] demo_pcE,
@@ -727,4 +728,6 @@ module riscv(
     assign perf_stall_ifetch = ifetch_stall;
     assign perf_flush_branch = redirectE & ~memstallM;
     assign perf_flush_trap = trap_flush & ~memstallM;
+    assign perf_forward = validE & ~memstallM &
+                          ((forwardaE != 2'b00) | (forwardbE != 2'b00));
 endmodule

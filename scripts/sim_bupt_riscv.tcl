@@ -57,7 +57,20 @@ proc run_tb {proj_dir tb_name success_marker} {
     }
 }
 
-run_tb $proj_dir bupt_riscv_tb "Simulation succeeded: BUPT RISC-V CPU verified"
-run_tb $proj_dir bupt_riscv_demo_tb "Simulation succeeded: pipeline demo stepping verified"
-run_tb $proj_dir pipeline_demo_panel_tb "Simulation succeeded: pipeline demo panel verified"
+set tests {
+    {bupt_riscv_acceptance_tb {Simulation succeeded: enhanced acceptance UART verified}}
+    {bupt_riscv_tb {Simulation succeeded: BUPT RISC-V CPU verified}}
+    {bupt_riscv_demo_tb {Simulation succeeded: pipeline demo stepping verified}}
+    {bupt_riscv_scenarios_tb {Simulation succeeded: enhanced pipeline scenarios verified}}
+    {pipeline_demo_panel_tb {Simulation succeeded: pipeline demo panel verified}}
+    {acceptance_mmio_tb {Simulation succeeded: acceptance MMIO verified}}
+}
+foreach test $tests {
+    lassign $test tb_name success_marker
+    if {![info exists env(BUPT_RISCV_SIM_ONLY)] ||
+        $env(BUPT_RISCV_SIM_ONLY) eq "" ||
+        $env(BUPT_RISCV_SIM_ONLY) eq $tb_name} {
+        run_tb $proj_dir $tb_name $success_marker
+    }
+}
 puts "BUPT_RISCV_SIM_DONE"

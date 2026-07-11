@@ -31,6 +31,8 @@ module bupt_riscv_tb();
     wire demo_stall_ifetch;
     wire demo_flush_branch;
     wire demo_flush_trap;
+    wire acceptance_active;
+    wire[15:0] acceptance_status;
 
     wire ddr_backend_valid;
     wire ddr_backend_we;
@@ -63,6 +65,8 @@ module bupt_riscv_tb();
         .uart_rx_i(uart_rx_i),
         .uart_tx_o(uart_tx_o),
         .led(led),
+        .acceptance_active(acceptance_active),
+        .acceptance_status(acceptance_status),
         .ddr_backend_valid(ddr_backend_valid),
         .ddr_backend_we(ddr_backend_we),
         .ddr_backend_wstrb(ddr_backend_wstrb),
@@ -134,7 +138,7 @@ module bupt_riscv_tb();
     always @(posedge clk) begin
         if (!rst) begin
             cycle_count <= cycle_count + 1;
-            if (cycle_count > 5000000) begin
+            if (cycle_count > 20000000) begin
                 $display("Simulation Failed: timeout");
                 $display("DEBUG pc=%h instr=%h instrD=%h pcD=%h pcE=%h validD=%b validE=%b",
                          dut.pc, dut.instr, dut.cpu.instrD, dut.cpu.pcD,
@@ -209,13 +213,13 @@ module bupt_riscv_tb();
     endtask
 
     task expect_string;
-        input [8*96-1:0] text;
+        input [8*128-1:0] text;
         integer i;
         integer len;
         reg[7:0] ch;
         begin
             len = 0;
-            for (i = 95; i >= 0; i = i - 1) begin
+            for (i = 127; i >= 0; i = i - 1) begin
                 ch = text[i*8 +: 8];
                 if (ch != 8'h00) begin
                     len = i + 1;
@@ -257,7 +261,7 @@ module bupt_riscv_tb();
     endtask
 
     task expect_line;
-        input [8*96-1:0] text;
+        input [8*128-1:0] text;
         begin
             expect_string(text);
             expect_crlf();
@@ -338,7 +342,7 @@ module bupt_riscv_tb();
         expect_string("rv32> ");
 
         send_line("help");
-        expect_line("help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat");
+        expect_line("help accept accept clear mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat");
         expect_string("rv32> ");
 
         send_line("mem");
@@ -390,6 +394,8 @@ module bupt_riscv_tb();
         expect_hex_line();
         expect_string("flush_tr=");
         expect_hex_line();
+        expect_string("forwards=");
+        expect_hex_line();
         expect_string("rv32> ");
 
         send_line("perf clear");
@@ -421,6 +427,8 @@ module bupt_riscv_tb();
         expect_hex_line();
         expect_string("flush_tr=");
         expect_hex_line();
+        expect_string("forwards=");
+        expect_hex_line();
         expect_string("rv32> ");
 
         send_line("bench alu");
@@ -448,6 +456,8 @@ module bupt_riscv_tb();
         expect_hex_line();
         expect_string("flush_tr=");
         expect_hex_line();
+        expect_string("forwards=");
+        expect_hex_line();
         expect_string("rv32> ");
 
         send_line("bench mem");
@@ -474,6 +484,8 @@ module bupt_riscv_tb();
         expect_string("flush_br=");
         expect_hex_line();
         expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("forwards=");
         expect_hex_line();
         expect_string("misses=");
         expect_hex_line();
@@ -504,6 +516,8 @@ module bupt_riscv_tb();
         expect_hex_line();
         expect_string("flush_tr=");
         expect_hex_line();
+        expect_string("forwards=");
+        expect_hex_line();
         expect_string("rv32> ");
 
         send_line("perf");
@@ -530,6 +544,8 @@ module bupt_riscv_tb();
         expect_string("flush_br=");
         expect_hex_line();
         expect_string("flush_tr=");
+        expect_hex_line();
+        expect_string("forwards=");
         expect_hex_line();
         expect_string("rv32> ");
 
