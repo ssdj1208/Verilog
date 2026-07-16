@@ -1,0 +1,364 @@
+ECHO is off.
+ECHO is off.
+
+****** Vivado v2023.2 (64-bit)
+  **** SW Build 4029153 on Fri Oct 13 20:14:34 MDT 2023
+  **** IP Build 4028589 on Sat Oct 14 00:45:43 MDT 2023
+  **** SharedData Build 4025554 on Tue Oct 10 17:18:54 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source {scripts\sim_bupt_riscv.tcl}
+# set script_dir [file dirname [file normalize [info script]]]
+# set repo_dir [file normalize [file join $script_dir ..]]
+# set sim_dir [file normalize [file join $repo_dir build bupt_riscv_sim]]
+# set proj_dir [file normalize [file join $sim_dir vivado]]
+# set common_files [glob -nocomplain [file join $repo_dir src common *.v]]
+# set core_files [glob -nocomplain [file join $repo_dir src bupt_riscv riscv_core *.v]]
+# set soc_files [glob -nocomplain [file join $repo_dir src bupt_riscv *.v]]
+# if {[llength $common_files] == 0} {
+#     error "No UART/common RTL found under src/common/*.v"
+# }
+# if {[llength $core_files] == 0} {
+#     error "No RISC-V core RTL found under src/bupt_riscv/riscv_core/*.v"
+# }
+# if {[llength $soc_files] == 0} {
+#     error "No SoC RTL found under src/bupt_riscv/*.v"
+# }
+# file mkdir $sim_dir
+# cd $sim_dir
+# create_project bupt_riscv_sim $proj_dir -part xc7a100tcsg324-1 -force
+create_project: Time (s): cpu = 00:00:14 ; elapsed = 00:00:16 . Memory (MB): peak = 486.234 ; gain = 178.504
+# file copy -force [file join $repo_dir src bupt_riscv bupt_riscv_boot.mem] [file join $sim_dir bupt_riscv_boot.mem]
+# file mkdir [file join $proj_dir bupt_riscv_sim.sim sim_1 behav xsim]
+# file copy -force [file join $repo_dir src bupt_riscv bupt_riscv_boot.mem] [file join $proj_dir bupt_riscv_sim.sim sim_1 behav xsim bupt_riscv_boot.mem]
+# add_files $common_files
+# add_files $core_files
+# foreach rtl $soc_files {
+#     if {[lsearch -exact {top.v clock_gen.v mig_axi_adapter.v} [file tail $rtl]] < 0} {
+#         add_files $rtl
+#     }
+# }
+# set sim_files [glob -nocomplain [file join $repo_dir sim *.v]]
+# if {[llength $sim_files] == 0} {
+#     error "No simulation testbenches found under sim/*.v"
+# }
+# add_files -fileset sim_1 $sim_files
+# update_compile_order -fileset sim_1
+# proc run_tb {proj_dir tb_name success_marker} {
+#     set_property top $tb_name [get_filesets sim_1]
+#     launch_simulation -simset sim_1 -mode behavioral
+#     restart
+#     run all
+#     close_sim
+#     set sim_log [file join $proj_dir bupt_riscv_sim.sim sim_1 behav xsim simulate.log]
+#     if {![file exists $sim_log]} {
+#         error "Simulation log not found for $tb_name: $sim_log"
+#     }
+#     set fh [open $sim_log r]
+#     set log_text [read $fh]
+#     close $fh
+#     if {[string first "Simulation Failed" $log_text] >= 0} {
+#         error "Simulation reported failure for $tb_name"
+#     }
+#     if {[string first $success_marker $log_text] < 0} {
+#         error "Simulation success marker not found for $tb_name"
+#     }
+# }
+# set tests {
+#     {bupt_riscv_acceptance_tb {Simulation succeeded: enhanced acceptance UART verified}}
+#     {bupt_riscv_tb {Simulation succeeded: BUPT RISC-V CPU verified}}
+#     {bupt_riscv_demo_tb {Simulation succeeded: pipeline demo stepping verified}}
+#     {bupt_riscv_scenarios_tb {Simulation succeeded: enhanced pipeline scenarios verified}}
+#     {pipeline_demo_panel_tb {Simulation succeeded: pipeline demo panel verified}}
+#     {acceptance_mmio_tb {Simulation succeeded: acceptance MMIO verified}}
+# }
+# foreach test $tests {
+#     lassign $test tb_name success_marker
+#     if {![info exists env(BUPT_RISCV_SIM_ONLY)] ||
+#         $env(BUPT_RISCV_SIM_ONLY) eq "" ||
+#         $env(BUPT_RISCV_SIM_ONLY) eq $tb_name} {
+#         run_tb $proj_dir $tb_name $success_marker
+#     }
+# }
+Command: launch_simulation  -simset sim_1 -mode behavioral
+INFO: [Vivado 12-12493] Simulation top is 'bupt_riscv_scenarios_tb'
+WARNING: [Vivado 12-13340] Unable to auto find GCC executables from simulator install path! (path not set)
+INFO: [Vivado 12-5682] Launching behavioral simulation in 'D:/CodeProject/Verilog_Project/COCP/Verilog/build/bupt_riscv_sim/vivado/bupt_riscv_sim.sim/sim_1/behav/xsim'
+INFO: [SIM-utils-51] Simulation object is 'sim_1'
+INFO: [SIM-utils-72] Using boost library from 'D:/Xilinx/Vivado/2023.2/tps/boost_1_72_0'
+INFO: [SIM-utils-54] Inspecting design source files for 'bupt_riscv_scenarios_tb' in fileset 'sim_1'...
+INFO: [USF-XSim-97] Finding global include files...
+INFO: [USF-XSim-98] Fetching design files from 'sim_1'...
+INFO: [USF-XSim-2] XSim::Compile design
+INFO: [USF-XSim-61] Executing 'COMPILE and ANALYZE' step in 'D:/CodeProject/Verilog_Project/COCP/Verilog/build/bupt_riscv_sim/vivado/bupt_riscv_sim.sim/sim_1/behav/xsim'
+"xvlog --incr --relax -prj bupt_riscv_scenarios_tb_vlog.prj"
+
+ECHO is off.
+
+ECHO is off.
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/acceptance_mmio.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module acceptance_mmio
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/alu.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module alu
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/boot_rom.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module boot_rom
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/bram_ram.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module bram_ram
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/branch_predictor.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module branch_predictor
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/dcache_2way_lru.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module dcache_2way_lru
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/ddr_bridge.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module ddr_bridge
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/ddr_model.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module ddr_model
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/flopenr.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module flopenr
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/flopenrc.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module flopenrc
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/fp_mmio.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module fp_mmio
+
+INFO: [VRFC 10-311] analyzing module fp32_add_pos
+
+INFO: [VRFC 10-311] analyzing module fp32_mul_pos
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/gpio_mmio.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module gpio_mmio
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/icache.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module icache
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/immgen.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module immgen
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/irq_controller.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module irq_controller
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/iter_div.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module iter_div
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/iter_mul.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module iter_mul
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/load_ext.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module load_ext
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/pc.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module pc
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/perf_mmio.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module perf_mmio
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/regfile.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module regfile
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/riscv.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module riscv
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/simple_bus.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module simple_bus
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/soc.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module soc
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/riscv_core/store_align.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module store_align
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/timer_mmio.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module timer_mmio
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/bupt_riscv/uart_mmio.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module uart_mmio
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/common/uart_rx.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module uart_rx
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/src/common/uart_tx.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module uart_tx
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/sim/bupt_riscv_scenarios_tb.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module bupt_riscv_scenarios_tb
+
+INFO: [VRFC 10-2263] Analyzing Verilog file "D:/CodeProject/Verilog_Project/COCP/Verilog/build/bupt_riscv_sim/vivado/bupt_riscv_sim.sim/sim_1/behav/xsim/glbl.v" into library xil_defaultlib
+
+INFO: [VRFC 10-311] analyzing module glbl
+
+INFO: [USF-XSim-69] 'compile' step finished in '3' seconds
+INFO: [USF-XSim-3] XSim::Elaborate design
+INFO: [USF-XSim-61] Executing 'ELABORATE' step in 'D:/CodeProject/Verilog_Project/COCP/Verilog/build/bupt_riscv_sim/vivado/bupt_riscv_sim.sim/sim_1/behav/xsim'
+"xelab --incr --debug typical --relax --mt 2 -L xil_defaultlib -L unisims_ver -L unimacro_ver -L secureip --snapshot bupt_riscv_scenarios_tb_behav xil_defaultlib.bupt_riscv_scenarios_tb xil_defaultlib.glbl -log elaborate.log"
+
+ECHO is off.
+
+ECHO is off.
+
+Vivado Simulator v2023.2
+
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+
+Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+Running: D:/Xilinx/Vivado/2023.2/bin/unwrapped/win64.o/xelab.exe --incr --debug typical --relax --mt 2 -L xil_defaultlib -L unisims_ver -L unimacro_ver -L secureip --snapshot bupt_riscv_scenarios_tb_behav xil_defaultlib.bupt_riscv_scenarios_tb xil_defaultlib.glbl -log elaborate.log 
+
+Using 2 slave threads.
+
+Starting static elaboration
+
+Pass Through NonSizing Optimizer
+
+Completed static elaboration
+
+Starting simulation data flow analysis
+
+Completed simulation data flow analysis
+
+Time Resolution for simulation is 1ps
+
+Compiling module xil_defaultlib.pc(WIDTH=32)
+
+Compiling module xil_defaultlib.flopenrc(WIDTH=32)
+
+Compiling module xil_defaultlib.flopenrc(WIDTH=1)
+
+Compiling module xil_defaultlib.regfile
+
+Compiling module xil_defaultlib.immgen
+
+Compiling module xil_defaultlib.flopenrc(WIDTH=5)
+
+Compiling module xil_defaultlib.flopenrc(WIDTH=3)
+
+Compiling module xil_defaultlib.flopenrc(WIDTH=2)
+
+Compiling module xil_defaultlib.flopenrc(WIDTH=12)
+
+Compiling module xil_defaultlib.alu
+
+Compiling module xil_defaultlib.iter_mul
+
+Compiling module xil_defaultlib.iter_div
+
+Compiling module xil_defaultlib.flopenr(WIDTH=32)
+
+Compiling module xil_defaultlib.flopenr(WIDTH=5)
+
+Compiling module xil_defaultlib.flopenr(WIDTH=3)
+
+Compiling module xil_defaultlib.flopenr(WIDTH=1)
+
+Compiling module xil_defaultlib.flopenr(WIDTH=2)
+
+Compiling module xil_defaultlib.store_align
+
+Compiling module xil_defaultlib.load_ext
+
+Compiling module xil_defaultlib.branch_predictor
+
+Compiling module xil_defaultlib.riscv
+
+Compiling module xil_defaultlib.boot_rom
+
+Compiling module xil_defaultlib.icache
+
+Compiling module xil_defaultlib.bram_ram
+
+Compiling module xil_defaultlib.gpio_mmio
+
+Compiling module xil_defaultlib.uart_tx(CLKS_PER_BIT=16)
+
+Compiling module xil_defaultlib.uart_rx(CLKS_PER_BIT=16)
+
+Compiling module xil_defaultlib.uart_mmio(CLKS_PER_BIT=16)
+
+Compiling module xil_defaultlib.timer_mmio(DEFAULT_COMPARE=32'b0...
+
+Compiling module xil_defaultlib.irq_controller
+
+Compiling module xil_defaultlib.perf_mmio
+
+Compiling module xil_defaultlib.acceptance_mmio
+
+Compiling module xil_defaultlib.fp32_add_pos
+
+Compiling module xil_defaultlib.fp32_mul_pos
+
+Compiling module xil_defaultlib.fp_mmio
+
+Compiling module xil_defaultlib.dcache_2way_lru
+
+Compiling module xil_defaultlib.ddr_bridge
+
+Compiling module xil_defaultlib.simple_bus(UART_CLKS_PER_BIT=16,...
+
+Compiling module xil_defaultlib.soc(UART_CLKS_PER_BIT=16,TIMER_T...
+
+Compiling module xil_defaultlib.ddr_model
+
+Compiling module xil_defaultlib.bupt_riscv_scenarios_tb
+
+Compiling module xil_defaultlib.glbl
+
+Built simulation snapshot bupt_riscv_scenarios_tb_behav
+
+INFO: [USF-XSim-69] 'elaborate' step finished in '5' seconds
+INFO: [USF-XSim-4] XSim::Simulate design
+INFO: [USF-XSim-61] Executing 'SIMULATE' step in 'D:/CodeProject/Verilog_Project/COCP/Verilog/build/bupt_riscv_sim/vivado/bupt_riscv_sim.sim/sim_1/behav/xsim'
+INFO: [USF-XSim-98] *** Running xsim
+   with args "bupt_riscv_scenarios_tb_behav -key {Behavioral:sim_1:Functional:bupt_riscv_scenarios_tb} -tclbatch {bupt_riscv_scenarios_tb.tcl} -log {simulate.log}"
+INFO: [USF-XSim-8] Loading simulator feature
+Time resolution is 1 ps
+source bupt_riscv_scenarios_tb.tcl
+## current_wave_config
+INFO: [USF-XSim-96] XSim completed. Design snapshot 'bupt_riscv_scenarios_tb_behav' loaded.
+INFO: [USF-XSim-97] XSim simulation ran for 1000ns
+launch_simulation: Time (s): cpu = 00:00:00 ; elapsed = 00:00:12 . Memory (MB): peak = 505.133 ; gain = 18.898
+INFO: [Wavedata 42-604] Simulation restarted
+Simulation succeeded: enhanced pipeline scenarios verified
+$finish called at time : 9885 ns : File "D:/CodeProject/Verilog_Project/COCP/Verilog/sim/bupt_riscv_scenarios_tb.v" Line 128
+INFO: [Simtcl 6-16] Simulation closed
+# puts "BUPT_RISCV_SIM_DONE"
+BUPT_RISCV_SIM_DONE
+INFO: [Common 17-206] Exiting Vivado at Thu Jul 16 15:12:31 2026...

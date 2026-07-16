@@ -1,0 +1,5 @@
+=== BUFFER ===
+
+=== HELP ===
+help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat
+rv32> 

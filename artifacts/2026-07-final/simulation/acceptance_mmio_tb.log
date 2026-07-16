@@ -1,0 +1,5 @@
+Time resolution is 1 ps
+Simulation succeeded: acceptance MMIO verified
+$finish called at time : 143 ns : File "D:/CodeProject/Verilog_Project/COCP/Verilog/sim/acceptance_mmio_tb.v" Line 91
+Simulation succeeded: acceptance MMIO verified
+$finish called at time : 143 ns : File "D:/CodeProject/Verilog_Project/COCP/Verilog/sim/acceptance_mmio_tb.v" Line 91

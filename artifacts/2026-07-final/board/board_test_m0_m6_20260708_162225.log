@@ -1,0 +1,181 @@
+BOARD_TEST_LOG=D:\CodeProject\Verilog_Project\COCP\Verilog\build\board_test_m0_m6_20260708_162225.log
+PORT=COM8 BAUD=115200 8N1
+
+>>> help
+help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat
+rv32> 
+>>> mem
+DDR TEST OK
+rv32> 
+>>> cache
+CACHE READY
+rv32> 
+>>> fp
+FP TEST OK
+rv32> 
+>>> perf
+cycles=44178A66
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> perf
+OK
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench alu
+BALU cycles=00021DD1
+rv32> 
+>>> perf
+cycles=00600990
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench alu
+BALU cycles=00021DC8
+rv32> 
+>>> perf
+cycles=005EFABD
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench mem
+BMEM cycles=0001C9F6
+misses=00000140
+rv32> 
+>>> perf
+cycles=006293B0
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench mem
+BMEM cycles=0001C9E2
+misses=00000140
+rv32> 
+>>> perf
+cycles=005FC94E
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench branch
+BBR branches=00005D94
+mispredicts=00000000
+rv32> 
+>>> perf
+cycles=005CD9A9
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench branch
+BBR branches=00005D93
+mispredicts=00000000
+rv32> 
+>>> perf
+cycles=006064FA
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> int stat
+tick=00000000
+pending=00000000
+rv32> 
+>>> int on
+INT ON
+rv32> 
+>>> int stat
+tick=0000007F
+pending=00000000
+rv32> 
+>>> int stat
+tick=000000FE
+pending=00000000
+rv32> 
+>>> int off
+INT OFF
+rv32> 
+>>> int stat
+tick=00000105
+pending=00000001
+rv32> 

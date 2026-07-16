@@ -1,0 +1,179 @@
+# BUPT RISC-V M0-M6 board test build18
+# Port=COM8 Baud=115200 Time=2026-07-08T16:47:16.0271528+08:00
+
+>>> help
+help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat
+rv32> 
+>>> mem
+DDR TEST OK
+rv32> 
+>>> cache
+CACHE READY
+rv32> 
+>>> fp
+FP TEST OK
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> perf
+cycles=045C6FAB
+retired=0174F0E7
+branches=00BAE31E
+mispredicts=00000163
+stalls=01777EA7
+stall_lu=00BC2A2E
+stall_md=00000000
+stall_dc=00BD01C1
+stall_if=0000017B
+stall_ddr=00000000
+flush_br=00000371
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench alu
+BALU cycles=00021DDD
+rv32> 
+>>> perf
+cycles=09182607
+retired=0308BFAF
+branches=0184BE91
+mispredicts=000001A1
+stalls=030BAEA9
+stall_lu=018601AF
+stall_md=000080E8
+stall_dc=0186D960
+stall_if=00000141
+stall_ddr=00000000
+flush_br=000003A8
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench alu
+BALU cycles=00021DD5
+rv32> 
+>>> perf
+cycles=0914498C
+retired=0307763F
+branches=018419DC
+mispredicts=00000199
+stalls=030A6545
+stall_lu=01855D01
+stall_md=000080E8
+stall_dc=018634B3
+stall_if=00000119
+stall_ddr=00000000
+flush_br=00000396
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench mem
+BMEM cycles=0001C9D8
+misses=00000140
+rv32> 
+>>> perf
+cycles=0D3B8B95
+retired=0469E53D
+branches=02355B52
+mispredicts=000001DF
+stalls=046CB3BA
+stall_lu=0236A042
+stall_md=00000000
+stall_dc=0237C0C0
+stall_if=00000262
+stall_ddr=000048AF
+flush_br=000003EC
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench mem
+BMEM cycles=0001C9D9
+misses=00000140
+rv32> 
+>>> perf
+cycles=0D2BC812
+retired=0464A40F
+branches=0232BABB
+mispredicts=000001E2
+stalls=04677288
+stall_lu=0233FFAD
+stall_md=00000000
+stall_dc=0235202A
+stall_if=00000261
+stall_ddr=000048B1
+flush_br=000003E6
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench branch
+BBR branches=00005D92
+mispredicts=0000079B
+rv32> 
+>>> perf
+cycles=0AD0BA5D
+retired=039BAA2B
+branches=01CE51FA
+mispredicts=00000911
+stalls=039E28CF
+stall_lu=01CF7F27
+stall_md=00000000
+stall_dc=01D056F8
+stall_if=0000014B
+stall_ddr=00000000
+flush_br=00000B1C
+flush_tr=00000000
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> bench branch
+BBR branches=00005D92
+mispredicts=00000797
+rv32> 
+>>> perf
+cycles=0AD1DD9E
+retired=039C0B4F
+branches=01CE828E
+mispredicts=00000907
+stalls=039E89FF
+stall_lu=01CFAFBF
+stall_md=00000000
+stall_dc=01D0878E
+stall_if=00000123
+stall_ddr=00000000
+flush_br=00000B10
+flush_tr=00000000
+rv32> 
+>>> int stat
+tick=00000000
+pending=00000000
+rv32> 
+>>> int on
+INT ON
+rv32> 
+>>> int stat
+tick=000000F1
+pending=00000000
+rv32> 
+>>> int stat
+tick=000001E4
+pending=00000000
+rv32> 
+>>> int off
+INT OFF
+rv32> 
+>>> int stat
+tick=0000023E
+pending=00000001
+rv32> 
+# LOG=D:/CodeProject/Verilog_Project/COCP/Verilog/build/board_test_m0_m6_build18_20260708_164716.log

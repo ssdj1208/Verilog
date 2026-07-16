@@ -1,0 +1,3 @@
+Time resolution is 1 ps
+Simulation succeeded: enhanced pipeline scenarios verified
+$finish called at time : 9885 ns : File "D:/CodeProject/Verilog_Project/COCP/Verilog/sim/bupt_riscv_scenarios_tb.v" Line 128

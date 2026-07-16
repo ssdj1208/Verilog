@@ -1,0 +1,73 @@
+BOARD_TEST_LOG=D:\CodeProject\Verilog_Project\COCP\Verilog\build\board_test_perf_recheck_20260708_162428.log
+PORT=COM8 BAUD=115200 8N1
+
+>>> perf clear
+OK
+rv32> 
+>>> perf x
+cycles=006B28D6
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> bench branch
+BBR branches=00005D93
+mispredicts=00000000
+rv32> 
+>>> perf x
+cycles=005F8234
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> bench alu
+BALU cycles=00021DCF
+rv32> 
+>>> perf x
+cycles=0061B779
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 
+>>> bench mem
+BMEM cycles=0001C9D5
+misses=00000140
+rv32> 
+>>> perf x
+cycles=00593A34
+retired=0000000D
+branches=00000000
+mispredicts=00000000
+stalls=0000003D
+stall_lu=0000000D
+stall_md=00000000
+stall_dc=00000000
+stall_if=0000003D
+stall_ddr=0000000D
+flush_br=00000000
+flush_tr=00000000
+rv32> 

@@ -1,0 +1,141 @@
+# BUPT RISC-V M0-M6 board test build19
+# Port=COM8 Baud=115200 Time=2026-07-08T17:08:02.5062509+08:00
+
+>>> help
+help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat
+rv32> 
+>>> mem
+DDR TEST OK
+rv32> 
+>>> cache
+CACHE READY
+rv32> 
+>>> fp
+FP TEST OK
+rv32> 
+>>> perf clear
+OK
+rv32> 
+>>> perf
+cycles=04D28AA2
+retired=019C4F3A
+branches=00CE9248
+mispredicts=00000161
+stalls=019EDD01
+stall_lu=00CFD959
+stall_md=00000000
+stall_dc=00D0B0ED
+stall_if=00000167
+stall_ddr=00000000
+flush_br=0000036C
+flush_tr=00000000
+rv32> 
+>>> bench alu
+BALU cycles=0000A81E
+retired=00001F47
+branches=000003E8
+mispredicts=00000002
+stalls=000080F3
+stall_lu=00000006
+stall_md=000080E8
+stall_dc=0000000F
+stall_if=0000004A
+stall_ddr=00000000
+flush_br=00000002
+flush_tr=00000000
+rv32> 
+>>> bench alu
+BALU cycles=0000A81E
+retired=00001F47
+branches=000003E8
+mispredicts=00000001
+stalls=000080F3
+stall_lu=00000006
+stall_md=000080E8
+stall_dc=0000000F
+stall_if=0000004A
+stall_ddr=00000000
+flush_br=00000001
+flush_tr=00000000
+rv32> 
+>>> bench mem
+BMEM cycles=00005405
+retired=0000070E
+branches=00000200
+mispredicts=00000006
+stalls=000048D4
+stall_lu=00000009
+stall_md=00000000
+stall_dc=000048D5
+stall_if=00000062
+stall_ddr=000048C5
+flush_br=00000006
+flush_tr=00000000
+misses=00000140
+rv32> 
+>>> bench mem
+BMEM cycles=0000540D
+retired=0000070E
+branches=00000200
+mispredicts=00000002
+stalls=000048E2
+stall_lu=00000009
+stall_md=00000000
+stall_dc=000048E3
+stall_if=00000061
+stall_ddr=000048D3
+flush_br=00000002
+flush_tr=00000000
+misses=00000140
+rv32> 
+>>> bench branch
+BBR branches=000019C8
+mispredicts=000003ED
+cycles=00004037
+retired=00000E17
+stalls=0000000E
+stall_lu=00000008
+stall_md=00000000
+stall_dc=0000000F
+stall_if=00000049
+stall_ddr=00000000
+flush_br=000003ED
+flush_tr=00000000
+rv32> 
+>>> bench branch
+BBR branches=000019C8
+mispredicts=000003EA
+cycles=00004035
+retired=00000E17
+stalls=0000000E
+stall_lu=00000008
+stall_md=00000000
+stall_dc=0000000F
+stall_if=00000049
+stall_ddr=00000000
+flush_br=000003EA
+flush_tr=00000000
+rv32> 
+>>> int stat
+tick=00000000
+pending=00000000
+rv32> 
+>>> int on
+INT ON
+rv32> 
+>>> int stat
+tick=000000FF
+pending=00000000
+rv32> 
+>>> int stat
+tick=000001FE
+pending=00000000
+rv32> 
+>>> int off
+INT OFF
+rv32> 
+>>> int stat
+tick=00000265
+pending=00000001
+rv32> 
+# LOG=D:/CodeProject/Verilog_Project/COCP/Verilog/build/board_test_m0_m6_build19_20260708_170802.log

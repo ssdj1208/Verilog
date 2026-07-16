@@ -1,0 +1,4 @@
+Time resolution is 1 ps
+Simulation succeeded: BUPT RISC-V CPU verified
+$finish called at time : 15750775 ns : File "D:/CodeProject/Verilog_Project/COCP/Verilog/sim/bupt_riscv_tb.v" Line 575
+INFO: xsimkernel Simulation Memory Usage: 20440 KB (Peak: 20440 KB), Simulation CPU Usage: 24999 ms

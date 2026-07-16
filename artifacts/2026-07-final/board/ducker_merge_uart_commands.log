@@ -1,0 +1,23 @@
+=== help prompt=True ===
+help mem perf perf clear bench alu bench mem bench branch cache fp led run int on off stat
+rv32> 
+=== perf prompt=True ===
+cycles=9CA581E2
+retired=3437F4C9
+branches=1A1C62A8
+mispredicts=000004BC
+stalls=343A82DB
+stall_lu=1A1DA96E
+stall_md=00000108
+stall_dc=1A1E85B0
+stall_if=000004F7
+stall_ddr=0000038A
+flush_br=000006D1
+flush_tr=00000000
+rv32> 
+=== cache prompt=True ===
+CACHE READY
+rv32> 
+=== fp prompt=True ===
+FP TEST OK
+rv32> 

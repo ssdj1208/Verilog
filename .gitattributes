@@ -1,0 +1,2 @@
+artifacts/**/*.wdb filter=lfs diff=lfs merge=lfs -text
+artifacts/**/*.bit filter=lfs diff=lfs merge=lfs -text
